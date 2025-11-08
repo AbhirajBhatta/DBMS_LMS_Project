@@ -124,3 +124,35 @@ def upload_students_csv(request, class_id):
         messages.success(request, f"{added} students added successfully.")
 
     return redirect('class_manage', class_id=class_id)
+
+@login_required
+def class_detail(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
+
+    # Placeholder demo data — you’ll later fetch from DB
+    attendance = enrollment.attendance_percent() if enrollment else 0
+    assignments = []  # Will later pull from Assignment model
+    quizzes = []      # Will later pull from Quiz model
+    grades = []       # Will later pull from Grade model
+    materials = []    # Will later pull from Resource model
+
+    # Color logic for attendance
+    if attendance < 75:
+        attendance_color = "danger"
+    elif attendance < 80:
+        attendance_color = "warning"
+    elif attendance < 90:
+        attendance_color = "info"
+    else:
+        attendance_color = "success"
+
+    return render(request, "lms/class_detail.html", {
+        "classroom": classroom,
+        "attendance": attendance,
+        "attendance_color": attendance_color,
+        "assignments": assignments,
+        "quizzes": quizzes,
+        "grades": grades,
+        "materials": materials,
+    })

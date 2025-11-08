@@ -36,6 +36,13 @@ class Enrollment(models.Model):
     class Meta:
         unique_together = ('student', 'classroom')
 
+    def attendance_percent(self):
+        total_classes = self.attendance_records.count()
+        if total_classes == 0:
+            return 0.0
+        attended = self.attendance_records.filter(status='Present').count()
+        return round((attended / total_classes) * 100, 2)
+
 
 # Assignments linked to classrooms
 class Assignment(models.Model):
@@ -69,17 +76,21 @@ class Submission(models.Model):
 
 # Attendance tracking
 class Attendance(models.Model):
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='attendance_records')
-    student = models.ForeignKey(User, on_delete=models.CASCADE)
+    enrollment = models.ForeignKey(
+        'Enrollment',
+        on_delete=models.CASCADE,
+        related_name='attendance_records'
+    )
     date = models.DateField()
     present = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ('classroom', 'student', 'date')
+        unique_together = ('enrollment', 'date')
 
     def __str__(self):
         status = "Present" if self.present else "Absent"
-        return f"{self.student.username} - {self.classroom.code} ({status})"
+        return f"{self.enrollment.student.username} - {self.enrollment.classroom.code} ({status})"
+
 
 
 # Grades for quizzes / assignments

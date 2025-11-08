@@ -10,10 +10,10 @@
     {% for classroom in classrooms %}
       <div class="col">
         <div class="card p-3 shadow-sm">
-          <h5>{{ classroom.name }}</h5>
+          <h5 class="fw-semibold text-light">{{ classroom.name }}</h5>
           <p class="text-secondary mb-1">{{ classroom.code }}</p>
           <!-- Link to class dashboard -->
-          <a href="{% url 'class_detail' classroom.id %}" class="btn btn-outline-primary btn-sm mt-2">Open</a>
+          <a href="{% url 'class_detail' classroom.id %}" class="btn btn-outline-success btn-sm w-100 mt-2">Open</a>
         </div>
       </div>
     {% empty %}

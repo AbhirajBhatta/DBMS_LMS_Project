@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}{{ classroom.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h3 class="fw-bold text-light mb-3">{{ classroom.name }} <span class="text-secondary">({{ classroom.code }})</span></h3>
+  <p class="text-secondary">Instructor: {{ classroom.teacher.username }}</p>
+
+  <div class="row row-cols-1 row-cols-md-3 g-4 mt-3">
+    
+    <!-- Attendance -->
+    <div class="col">
+      <div class="card text-center p-4 shadow-sm border-{{ attendance_color }}"
+           style="background-color:#161b22; border-width:2px;">
+        <h5 class="text-light mb-3">Attendance</h5>
+        <h2 class="fw-bold text-{{ attendance_color }}">{{ attendance }}%</h2>
+      </div>
+    </div>
+
+    <!-- Assignments -->
+    <div class="col">
+      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
+        <h5 class="text-light mb-3">Assignments</h5>
+        {% if assignments %}
+          {% for a in assignments|slice:":3" %}
+            <div class="mb-2">
+              <p class="mb-0 text-light">{{ a.title }}</p>
+              <small class="text-secondary">Due {{ a.deadline }}</small>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-secondary">No assignments yet.</p>
+        {% endif %}
+        <a href="#" class="btn btn-outline-primary btn-sm mt-2">View All</a>
+      </div>
+    </div>
+
+    <!-- Quizzes -->
+    <div class="col">
+      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
+        <h5 class="text-light mb-3">Quizzes</h5>
+        {% if quizzes %}
+          {% for q in quizzes|slice:":3" %}
+            <div class="mb-2">
+              <p class="mb-0 text-light">{{ q.title }}</p>
+              <small class="text-secondary">{{ q.status }}</small>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-secondary">No quizzes yet.</p>
+        {% endif %}
+        <a href="#" class="btn btn-outline-warning btn-sm mt-2">View All</a>
+      </div>
+    </div>
+
+    <!-- Grades -->
+    <div class="col">
+      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
+        <h5 class="text-light mb-3">Grades</h5>
+        {% if grades %}
+          {% for g in grades|slice:":3" %}
+            <div class="mb-1 text-light">
+              {{ g.item_name }} — {{ g.score }}/10
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-secondary">No grades released yet.</p>
+        {% endif %}
+        <a href="#" class="btn btn-outline-success btn-sm mt-2">View All</a>
+      </div>
+    </div>
+
+    <!-- Materials -->
+    <div class="col">
+      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
+        <h5 class="text-light mb-3">Course Materials</h5>
+        {% if materials %}
+          {% for m in materials|slice:":3" %}
+            <div class="mb-1">
+              <a href="{{ m.file.url }}" class="text-info text-decoration-none">{{ m.title }}</a>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-secondary">No materials uploaded yet.</p>
+        {% endif %}
+        <a href="#" class="btn btn-outline-info btn-sm mt-2">View All</a>
+      </div>
+    </div>
+
+    <!-- Discussions -->
+    <div class="col">
+      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
+        <h5 class="text-light mb-3">Discussions</h5>
+        <p class="text-secondary">Join the latest class discussions posted by your instructor.</p>
+        <a href="#" class="btn btn-outline-light btn-sm mt-2">Open Discussions</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
