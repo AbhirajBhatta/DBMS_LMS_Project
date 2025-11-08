@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}Manage {{ classroom.name }}{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="card p-4 mb-4 shadow-sm"
+       style="background-color:#161b22; border:1px solid rgba(255,255,255,0.15); color:#e6eef6;">
+    <h4 class="fw-bold mb-3">{{ classroom.name }} <span class="text-secondary">({{ classroom.code }})</span></h4>
+
+    <div class="card p-3 mb-4"
+         style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+      <h5 class="text-light mb-3">Add Student</h5>
+      <form method="post" action="{% url 'add_student' classroom.id %}" class="d-flex gap-2">
+        {% csrf_token %}
+        <input type="text"
+               name="reg_no"
+               placeholder="Enter student register number"
+               class="form-control bg-dark text-light border-secondary"
+               required>
+        <button class="btn btn-success">Add</button>
+      </form>
+    </div>
+
+    <div class="card p-3 mb-4"
+         style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+      <h5 class="text-light mb-3">Bulk Upload (CSV)</h5>
+      <form method="post" enctype="multipart/form-data" action="{% url 'upload_students_csv' classroom.id %}">
+        {% csrf_token %}
+        <input type="file"
+               name="csv_file"
+               accept=".csv"
+               class="form-control bg-dark text-light border-secondary mb-2">
+        <button class="btn btn-primary w-100">Upload</button>
+      </form>
+      <small class="text-secondary mt-2 d-block">CSV must contain a single column: <code>reg_no</code></small>
+    </div>
+
+    <div class="card p-3 shadow-sm"
+         style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+      <h5 class="text-light mb-3">Enrolled Students</h5>
+      <table class="table table-dark table-hover align-middle mb-0">
+        <thead>
+          <tr class="text-light" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+            <th>Name</th>
+            <th>Register No</th>
+            <th>Attendance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in enrollments %}
+            <tr>
+              <td>{{ e.student.username }}</td>
+              <td>{{ e.student.profile.reg_no }}</td>
+              <td>
+                {% if e.attendance_percent < 75 %}
+                  <span class="text-danger fw-bold">{{ e.attendance_percent }}%</span>
+                {% elif e.attendance_percent < 80 %}
+                  <span class="text-warning fw-bold">{{ e.attendance_percent }}%</span>
+                {% elif e.attendance_percent < 90 %}
+                  <span class="text-info fw-bold">{{ e.attendance_percent }}%</span>
+                {% else %}
+                  <span class="text-success fw-bold">{{ e.attendance_percent }}%</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="3" class="text-secondary text-center">No students enrolled yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

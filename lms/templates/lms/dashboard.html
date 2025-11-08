@@ -1,39 +1,49 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
+
 <h3 class="mb-4">Welcome, {{ user.username }}!</h3>
 
 {% if user.profile.role == 'student' %}
+  <!-- Student Dashboard -->
   <div class="row row-cols-1 row-cols-md-3 g-4">
     {% for classroom in classrooms %}
       <div class="col">
-        <div class="card p-3">
+        <div class="card p-3 shadow-sm">
           <h5>{{ classroom.name }}</h5>
           <p class="text-secondary mb-1">{{ classroom.code }}</p>
-          <a href="#" class="btn btn-outline-primary btn-sm mt-2">Open</a>
+          <!-- Link to class dashboard -->
+          <a href="{% url 'class_detail' classroom.id %}" class="btn btn-outline-primary btn-sm mt-2">Open</a>
         </div>
       </div>
     {% empty %}
       <p>No classrooms enrolled yet.</p>
     {% endfor %}
   </div>
-{% else %}
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h5>Your Courses</h5>
-    <a href="#" class="btn btn-sm btn-primary">+ Add Course</a>
+
+{% elif user.profile.role == 'teacher' %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold text-light">Your Courses</h4>
+    <a href="{% url 'add_course' %}" class="btn btn-primary px-3">+ Add Course</a>
   </div>
+
   <div class="row row-cols-1 row-cols-md-3 g-4">
     {% for classroom in classrooms %}
       <div class="col">
-        <div class="card p-3">
-          <h5>{{ classroom.name }}</h5>
-          <p class="text-secondary mb-1">{{ classroom.code }}</p>
-          <a href="#" class="btn btn-outline-success btn-sm mt-2">Manage</a>
+        <div class="card p-4 shadow-sm" style="background:#161b22; border:1px solid rgba(255,255,255,0.08);">
+          <h5 class="fw-semibold text-light">{{ classroom.name }}</h5>
+          <p class="text-secondary mb-2">{{ classroom.code }}</p>
+          <a href="{% url 'class_manage' classroom.id %}" class="btn btn-outline-success btn-sm w-100 mt-2">
+            Manage
+          </a>
         </div>
       </div>
     {% empty %}
-      <p>No courses created yet.</p>
+      <p class="text-secondary">No courses created yet.</p>
     {% endfor %}
   </div>
 {% endif %}
+
+
 {% endblock %}
+

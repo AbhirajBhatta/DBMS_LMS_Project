@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Add Course{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <div class="card p-4 col-md-6 mx-auto shadow-lg"
+       style="background-color:#161b22; border:1px solid rgba(255,255,255,0.15); color:#e6eef6;">
+    <h4 class="mb-4 text-center fw-bold text-light">Create a New Course</h4>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} mt-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label text-light">Course Name</label>
+        <input name="name" class="form-control bg-dark text-light border-secondary"
+               placeholder="e.g. Introduction to AI" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label text-light">Course Code</label>
+        <input name="code" class="form-control bg-dark text-light border-secondary"
+               placeholder="e.g. CS101" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label text-light">Description</label>
+        <textarea name="description"
+                  class="form-control bg-dark text-light border-secondary"
+                  placeholder="Brief description of the course..."
+                  rows="3"></textarea>
+      </div>
+      <button class="btn btn-primary w-100 mt-3">Create Course</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
