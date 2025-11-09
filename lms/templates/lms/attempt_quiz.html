@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}{{ quiz.title }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">{{ quiz.title }}</h4>
+  <p class="text-secondary">{{ quiz.description }}</p>
+  <div class="alert alert-info text-center">
+    <span id="timer">Time Remaining: --:--</span>
+  </div>
+
+  <form method="post" id="quizForm">
+    {% csrf_token %}
+    {% for q in questions %}
+      <div class="card mb-3 p-3" style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.1);">
+        <strong class="text-light">{{ forloop.counter }}. {{ q.text }}</strong>
+        <div class="mt-2">
+         {% for opt in q.options.all %}
+            <div class="form-check">
+              {% if quiz.allow_multiple_correct %}
+                <input type="checkbox"
+                      name="{{ q.id }}"
+                      value="{{ opt.id }}"
+                      class="form-check-input"
+                      id="opt{{ opt.id }}">
+              {% else %}
+                <input type="radio"
+                      name="{{ q.id }}"
+                      value="{{ opt.id }}"
+                      class="form-check-input"
+                      id="opt{{ opt.id }}">
+              {% endif %}
+              <label class="form-check-label text-light" for="opt{{ opt.id }}">
+                {{ opt.text }}
+              </label>
+            </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success w-100">Submit Quiz</button>
+  </form>
+</div>
+
+<script>
+const endTime = new Date("{{ quiz.end_time|date:'Y-m-d H:i:s' }}").getTime();
+const timerEl = document.getElementById("timer");
+
+function updateTimer() {
+  const now = new Date().getTime();
+  const diff = endTime - now;
+  if (diff <= 0) {
+    timerEl.innerText = "Time’s up!";
+    document.getElementById("quizForm").submit();
+    return;
+  }
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  timerEl.innerText = `Time Remaining: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+setInterval(updateTimer, 1000);
+</script>
+{% endblock %}

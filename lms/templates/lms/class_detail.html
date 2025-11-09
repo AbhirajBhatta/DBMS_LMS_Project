@@ -85,17 +85,23 @@
               {% for q in quizzes|slice:":3" %}
                 <div class="mb-2">
                   <p class="mb-0 text-light">{{ q.title }}</p>
-                  <small class="text-secondary">{{ q.status }}</small>
+                  {% if "Due" in q.status %}
+                    <small class="text-warning">{{ q.status }}</small>
+                  {% else %}
+                    <small class="text-secondary">{{ q.status }}</small>
+                  {% endif %}
                 </div>
               {% endfor %}
             {% else %}
               <p class="text-secondary">No quizzes yet.</p>
             {% endif %}
           </div>
-          <a href="#" class="btn btn-outline-warning btn-sm mt-3 w-100">View All</a>
+          <a href="{% url 'class_quizzes_student' classroom.id %}" class="btn btn-outline-warning btn-sm mt-3 w-100">View All</a>
         </div>
       </div>
     </div>
+
+
 
     <!-- Grades Overview Card -->
     <div class="col d-flex">
@@ -130,13 +136,12 @@
               Final Weighted Grade:
               <span class="text-success">{{ final_grade }}/10</span>
             </h6>
-            <a href="#" class="btn btn-outline-success btn-sm w-100 mt-2">
-              View Detailed Grades
-            </a>
+            <!-- removed "View Detailed Grades" button as requested -->
           </div>
         </div>
       </div>
     </div>
+
 
 
     <!-- Course Materials -->

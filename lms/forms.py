@@ -1,6 +1,6 @@
 # lms/forms.py
 from django import forms
-from .models import Assignment
+from .models import Assignment, Quiz
 
 class AssignmentForm(forms.ModelForm):
     class Meta:
@@ -32,3 +32,13 @@ class AssignmentForm(forms.ModelForm):
             if file.size > 5 * 1024 * 1024:  # 5 MB limit
                 raise forms.ValidationError("File size cannot exceed 5 MB.")
         return file
+
+class QuizForm(forms.ModelForm):
+    class Meta:
+        model = Quiz
+        fields = ["title", "description", "start_time", "end_time", "visible"]
+        widgets = {
+            "start_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "end_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }

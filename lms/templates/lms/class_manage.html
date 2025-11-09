@@ -83,6 +83,22 @@
       </div>
     </div>
 
+    <!-- Quizzes -->
+    <div class="card p-3 mb-4 shadow-sm" style="background-color:#161b22;">
+      <h5 class="text-light mb-3">Quizzes</h5>
+      <p class="text-secondary small mb-3">
+        Create and manage quizzes for this course. You can also view student attempts and scores.
+      </p>
+      <div class="d-flex gap-2">
+        <a href="{% url 'add_quiz' class_id=classroom.id %}" class="btn btn-outline-success flex-fill">
+          Add
+        </a>
+        <a href="{% url 'class_quizzes_teacher' class_id=classroom.id %}" class="btn btn-outline-warning flex-fill">
+          View Attempts
+        </a>
+      </div>
+    </div>
+
     <!-- Enrolled Students -->
     <div class="card p-3 shadow-sm"
          style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">

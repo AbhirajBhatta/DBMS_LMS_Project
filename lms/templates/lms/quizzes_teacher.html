@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}Quizzes — {{ classroom.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="text-light">Manage Quizzes — {{ classroom.name }}</h4>
+    <a href="{% url 'add_quiz' classroom.id %}" class="btn btn-success">+ Create Quiz</a>
+  </div>
+
+  {% if quizzes %}
+  <table class="table table-dark table-hover align-middle">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for q in quizzes %}
+      <tr>
+        <td>{{ q.title }}</td>
+        <td>{{ q.start_time|date:"Y-m-d H:i" }}</td>
+        <td>{{ q.end_time|date:"Y-m-d H:i" }}</td>
+        <td>
+          {% if q.is_active %}
+            <span class="text-success">Ongoing</span>
+          {% elif q.end_time < now %}
+            <span class="text-danger">Ended</span>
+          {% else %}
+            <span class="text-warning">Upcoming</span>
+          {% endif %}
+        </td>
+        <td class="d-flex gap-2">
+          <a href="{% url 'add_question' q.id %}" class="btn btn-outline-info btn-sm flex-fill">Edit</a>
+          <a href="{% url 'view_attempts_teacher' q.id %}" class="btn btn-outline-success btn-sm flex-fill">View Attempts</a>
+
+          <form method="post" action="{% url 'delete_quiz' q.id %}" onsubmit="return confirm('Delete this quiz permanently?');" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm flex-fill">Delete</button>
+          </form>
+        </td>
+        <td>
+          {% if q.visible %}
+            <span class="text-success">Active</span>
+          {% else %}
+            <span class="text-secondary">Draft</span>
+          {% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-secondary">No quizzes created yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

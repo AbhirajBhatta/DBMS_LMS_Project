@@ -24,5 +24,13 @@ urlpatterns = [
     path('submission/<int:submission_id>/grade/', views.grade_submission, name='grade_submission'),
     path('assignment/<int:assignment_id>/edit/', views.edit_assignment, name='edit_assignment'),
 
+    #QUIZZES
+    path('class/<int:class_id>/quizzes/teacher/', views.quizzes_teacher, name='class_quizzes_teacher'),
+    path('class/<int:class_id>/quizzes/student/', views.quizzes_student, name='class_quizzes_student'),
+    path('class/<int:class_id>/quizzes/add/', views.add_quiz, name='add_quiz'),
+    path('quiz/<int:quiz_id>/add_question/', views.add_question, name='add_question'),
+    path('quiz/<int:quiz_id>/attempt/', views.attempt_quiz, name='attempt_quiz'),
+    path('quiz/<int:quiz_id>/attempts/', views.view_attempts_teacher, name='view_attempts_teacher'),
+    path('quiz/<int:quiz_id>/delete/', views.delete_quiz, name='delete_quiz'),
 
-]
+]   

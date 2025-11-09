@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Create Quiz — {{ classroom.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">Create Quiz</h4>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label text-light">Title</label>
+      <input type="text" name="title" class="form-control bg-dark text-light border-secondary" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label text-light">Description</label>
+      <textarea name="description" class="form-control bg-dark text-light border-secondary" rows="3"></textarea>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col">
+        <label class="form-label text-light">Start Time</label>
+        <input type="datetime-local" name="start_time" class="form-control bg-dark text-light border-secondary" required>
+      </div>
+      <div class="col">
+        <label class="form-label text-light">End Time</label>
+        <input type="datetime-local" name="end_time" class="form-control bg-dark text-light border-secondary" required>
+      </div>
+    </div>
+
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" name="allow_multiple" id="allow_multiple">
+      <label class="form-check-label text-light" for="allow_multiple">
+        Allow multiple correct answers
+      </label>
+    </div>
+
+    <button class="btn btn-success w-100">Create Quiz</button>
+  </form>
+</div>
+{% endblock %}

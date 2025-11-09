@@ -6,13 +6,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db import IntegrityError
 from django.contrib import messages
 import csv, io
-from django.db.models import Avg
-from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, Quiz, Question, Attendance, SubmissionHistory, QuizAttempt
+from django.db.models import Max, Avg
+from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, Quiz, Question, Attendance, SubmissionHistory, QuizAttempt, Option
 from datetime import date, datetime
 from django.utils.dateformat import DateFormat
 from django.utils import timezone
 from django.contrib import messages
 from .forms import AssignmentForm
+from django.utils.dateparse import parse_datetime
 
 
 # Main dashboard (replaces old dashboard)
@@ -164,18 +165,18 @@ def class_detail(request, class_id):
     # === Fetch Visible Assignments ===
     assignments = Assignment.objects.filter(classroom=classroom, visible=True).order_by('deadline')
 
-    # === AUTO-MARK / CLEANUP LOGIC ===
+    # === AUTO-MARK / CLEANUP LOGIC (Assignments) ===
     if not is_teacher and enrollment:
         student = request.user
         for a in assignments:
             sub = Submission.objects.filter(student=student, assignment=a).first()
 
-            # If deadline was extended (now in future), remove prior auto-zero
+            # If deadline extended -> remove old auto-zero
             if sub and sub.marks == 0 and sub.graded and a.deadline > now:
                 sub.delete()
                 continue
 
-            # If not submitted and deadline passed → auto-create 0
+            # If deadline passed and no submission -> auto-zero
             if not sub and a.deadline < now:
                 Submission.objects.update_or_create(
                     student=student,
@@ -184,7 +185,7 @@ def class_detail(request, class_id):
                         'marks': 0.0,
                         'graded': True,
                         'released': True,
-                        'submitted_at': a.deadline  # record original deadline as submission time
+                        'submitted_at': a.deadline
                     }
                 )
 
@@ -220,7 +221,64 @@ def class_detail(request, class_id):
         else:
             attendance_color = "success"
 
-    # === Assignment Average (all assignments, including auto-zeros) ===
+    # === QUIZ LOGIC: Auto-zero, best-of-two, best-score contribution ===
+    best_quiz_score = 0
+    pending_quiz_exists = False
+    quizzes_context = []
+
+    if not is_teacher and enrollment:
+        student = request.user
+        quizzes = Quiz.objects.filter(classroom=classroom, visible=True).order_by('end_time')
+
+        for quiz in quizzes:
+            attempts = QuizAttempt.objects.filter(student=student, quiz=quiz)
+
+            # Clean old auto-zero if quiz extended
+            auto_zero = attempts.filter(auto_submitted=True).first()
+            if auto_zero and quiz.end_time > now:
+                auto_zero.delete()
+                attempts = QuizAttempt.objects.filter(student=student, quiz=quiz)
+
+            # Auto-mark 0 if missed and quiz ended
+            if not attempts.exists() and quiz.end_time < now:
+                QuizAttempt.objects.create(
+                    student=student,
+                    quiz=quiz,
+                    score=0.0,
+                    graded=True,
+                    auto_submitted=True,
+                    submitted_at=quiz.end_time
+                )
+                attempts = QuizAttempt.objects.filter(student=student, quiz=quiz)
+
+            # Determine quiz status for display
+            if quiz.end_time > now and not attempts.exists():
+                status = "Quiz Due"
+                pending_quiz_exists = True
+            elif attempts.exists():
+                latest_attempt = attempts.order_by('-submitted_at').first()
+                status = f"Attempted • {latest_attempt.score}/10"
+            else:
+                status = "No Attempts"
+
+            quizzes_context.append({
+                "title": quiz.title,
+                "status": status
+            })
+
+        # --- Best-of logic: find best score per quiz and then the highest across quizzes ---
+        all_best_scores = []
+        for quiz in Quiz.objects.filter(classroom=classroom, visible=True):
+            score = QuizAttempt.best_score(quiz, student)
+            if score is not None:
+                all_best_scores.append(score)
+
+        if all_best_scores:
+            best_quiz_score = max(all_best_scores)
+        else:
+            best_quiz_score = 0
+
+    # === Assignment Average ===
     assignment_avg = 0
     total_assignments = assignments.count()
 
@@ -229,17 +287,11 @@ def class_detail(request, class_id):
         total_marks = sum(s.marks or 0 for s in subs)
         assignment_avg = round(total_marks / total_assignments, 2)
 
-    # === Quiz Average (if you have quizzes model, else stays 0) ===
-    quiz_avg = QuizAttempt.objects.filter(
-        student=request.user,
-        quiz__classroom=classroom,
-        graded=True
-    ).aggregate(Avg('score'))['score__avg'] or 0
+    # === Final Weighted Grade ===
+    # Assignments = 50%, Best Quiz = 50%
+    final_grade = round(0.5 * assignment_avg + 0.5 * best_quiz_score, 2)
 
-    # === Final Weighted Grade (Assignments + Quizzes) ===
-    final_grade = round(0.5 * assignment_avg + 0.5 * quiz_avg, 2)
-
-    # === Count Overdue Auto-Zero Submissions (for dashboard + per-assignment flag) ===
+    # === Overdue Auto-Zero Assignments ===
     overdue_zeros = 0
     if not is_teacher:
         overdue_zeros = Submission.objects.filter(
@@ -250,24 +302,27 @@ def class_detail(request, class_id):
             assignment__deadline__lt=now
         ).count()
 
-    # === Context for Template ===
+    # === Context ===
+    # NOTE: quiz_avg is provided for template compatibility and is the score used for grading (best_quiz_score)
     context = {
         "classroom": classroom,
         "assignments": assignments,
         "attendance": round(attendance, 2),
         "attendance_color": attendance_color,
         "assignment_avg": assignment_avg,
-        "quiz_avg": round(quiz_avg, 2),
+        "quiz_avg": round(best_quiz_score, 2),   # <-- ensures template {{ quiz_avg }} is populated
+        "best_quiz_score": round(best_quiz_score, 2),
         "final_grade": final_grade,
         "pending_assignments": pending_assignments,
         "submission_map": submission_map,
+        "pending_quiz_exists": pending_quiz_exists,
         "is_teacher": is_teacher,
         "now": now,
         "overdue_zeros": overdue_zeros,
+        "quizzes": quizzes_context,  # for template loop
     }
 
     return render(request, "lms/class_detail.html", context)
-
 
 
 @login_required
@@ -556,74 +611,203 @@ def edit_assignment(request, assignment_id):
         'classroom': classroom
     })
 
+#Quizzes
+
+# =========================
+# TEACHER: VIEW QUIZZES
+# =========================
+@login_required
 @login_required
 def quizzes_teacher(request, class_id):
-    classroom = get_object_or_404(Classroom, id=class_id)
-    if classroom.teacher != request.user:
-        messages.error(request, "Unauthorized access.")
-        return redirect('main')
+    """
+    Display all quizzes created by the teacher for a given classroom.
+    Shows real-time status (Upcoming, Ongoing, Finished) with timezone-safe logic.
+    """
+    classroom = get_object_or_404(Classroom, id=class_id, teacher=request.user)
+    quizzes = list(Quiz.objects.filter(classroom=classroom).order_by('-start_time'))
+    now = timezone.now()
+    tz = timezone.get_current_timezone()
 
-    quizzes = Quiz.objects.filter(classroom=classroom)
-    return render(request, 'lms/quizzes_teacher.html', {'classroom': classroom, 'quizzes': quizzes})
+    for q in quizzes:
+        # Normalize start/end times to aware datetimes
+        start = q.start_time
+        end = q.end_time
+
+        if start and timezone.is_naive(start):
+            start = timezone.make_aware(start, tz)
+        if end and timezone.is_naive(end):
+            end = timezone.make_aware(end, tz)
+
+        # Compute status robustly
+        if start and end:
+            if start <= now <= end:
+                q.status_display = "Ongoing"
+                q.status_color = "text-success"
+            elif end < now:
+                q.status_display = "Finished"
+                q.status_color = "text-secondary"
+            else:
+                q.status_display = "Upcoming"
+                q.status_color = "text-warning"
+        else:
+            q.status_display = "Draft"
+            q.status_color = "text-muted"
+
+        # Localize times for display
+        q.start_local = timezone.localtime(start) if start else None
+        q.end_local = timezone.localtime(end) if end else None
+
+    context = {
+        'classroom': classroom,
+        'quizzes': quizzes,
+        'now': timezone.localtime(now),
+    }
+    return render(request, 'lms/quizzes_teacher.html', context)
 
 
+# =========================
+# TEACHER: ADD QUIZ
+# =========================
 @login_required
 def add_quiz(request, class_id):
-    classroom = get_object_or_404(Classroom, id=class_id)
-    if classroom.teacher != request.user:
-        messages.error(request, "Unauthorized.")
-        return redirect('main')
+    classroom = get_object_or_404(Classroom, id=class_id, teacher=request.user)
 
-    if request.method == "POST":
-        title = request.POST.get('title')
-        description = request.POST.get('description', '')
-        deadline = request.POST.get('deadline')
+    if request.method == 'POST':
+        title = request.POST['title'].strip()
+        desc = request.POST.get('description', '').strip()
+        start = request.POST.get('start_time')
+        end = request.POST.get('end_time')
+        allow_multiple = bool(request.POST.get('allow_multiple'))
+
+        # prevent duplicate quiz creation
+        existing = Quiz.objects.filter(
+            classroom=classroom,
+            title=title,
+            start_time=start,
+            end_time=end
+        ).first()
+
+        if existing:
+            messages.info(request, "Quiz already exists — redirecting to question page.")
+            return redirect('add_question', quiz_id=existing.id)
 
         quiz = Quiz.objects.create(
             classroom=classroom,
             title=title,
-            description=description,
-            deadline=deadline
+            description=desc,
+            start_time=start,
+            end_time=end,
+            allow_multiple_correct=allow_multiple,
+            visible=False,
         )
-        messages.success(request, "Quiz created. Now add questions.")
-        return redirect('add_questions', quiz_id=quiz.id)
+
+        messages.success(request, "Quiz created successfully.")
+        return redirect('add_question', quiz_id=quiz.id)
 
     return render(request, 'lms/add_quiz.html', {'classroom': classroom})
 
-
 @login_required
-def add_questions(request, quiz_id):
-    quiz = get_object_or_404(Quiz, id=quiz_id)
-    if quiz.classroom.teacher != request.user:
-        messages.error(request, "Unauthorized.")
-        return redirect('main')
+def delete_quiz(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id, classroom__teacher=request.user)
+    title = quiz.title
+    quiz.delete()
+    messages.success(request, f"Quiz '{title}' deleted successfully.")
+    return redirect('class_quizzes_teacher', class_id=quiz.classroom.id)
 
-    if request.method == "POST":
-        text = request.POST.get('text')
-        a = request.POST.get('option_a')
-        b = request.POST.get('option_b')
-        c = request.POST.get('option_c')
-        d = request.POST.get('option_d')
-        correct = request.POST.get('correct_option')
 
-        Question.objects.create(
-            quiz=quiz, text=text,
-            option_a=a, option_b=b, option_c=c, option_d=d,
-            correct_option=correct
-        )
-        messages.success(request, "Question added successfully.")
-        return redirect('add_questions', quiz_id=quiz.id)
+# =========================
+# TEACHER: ADD QUESTIONS
+# =========================
+@login_required
+def add_question(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id, classroom__teacher=request.user)
+    questions = quiz.questions.prefetch_related('options')
 
-    questions = quiz.questions.all()
-    return render(request, 'lms/add_questions.html', {'quiz': quiz, 'questions': questions})
+    if request.method == 'POST':
+        # 1️⃣ Update Quiz Timings
+        if 'update_timing' in request.POST:
+            start = request.POST.get('start_time')
+            end = request.POST.get('end_time')
 
+            if not start or not end:
+                messages.error(request, "Both start and end times are required.")
+            else:
+                start_dt = parse_datetime(start)
+                end_dt = parse_datetime(end)
+
+                if not start_dt or not end_dt:
+                    messages.error(request, "Invalid date/time format.")
+                elif end_dt <= start_dt:
+                    messages.error(request, "End time must be later than start time.")
+                else:
+                    quiz.start_time = start_dt
+                    quiz.end_time = end_dt
+                    quiz.save()
+                    messages.success(request, "Quiz timings updated successfully.")
+
+            return render(request, 'lms/add_question.html', {'quiz': quiz, 'questions': questions})
+
+        # 2️⃣ Add Question
+        elif 'add_question' in request.POST:
+            text = request.POST.get('question', '').strip()
+            options = request.POST.getlist('option_text')
+            correct = request.POST.getlist('correct_option')
+
+            # Backend validation
+            if not text:
+                messages.error(request, "Question text cannot be empty.")
+            elif len(options) < 2:
+                messages.error(request, "Please provide at least two options.")
+            elif not correct:
+                messages.error(request, "Please select at least one correct answer.")
+            else:
+                # Create question + options
+                q = Question.objects.create(quiz=quiz, text=text)
+                for i, opt in enumerate(options):
+                    Option.objects.create(
+                        question=q,
+                        text=opt.strip(),
+                        is_correct=(str(i) in correct)
+                    )
+                quiz.visible = True
+                quiz.save()
+                messages.success(request, "Question added successfully.")
+
+            questions = quiz.questions.prefetch_related('options')
+            return render(request, 'lms/add_question.html', {'quiz': quiz, 'questions': questions})
+
+        # 3️⃣ Save Quiz
+        elif 'save_quiz' in request.POST:
+            if quiz.questions.count() == 0:
+                messages.error(request, "Quiz must have at least one question before saving.")
+            elif not quiz.start_time or not quiz.end_time:
+                messages.error(request, "Please set valid start and end times before saving.")
+            elif quiz.end_time <= quiz.start_time:
+                messages.error(request, "End time must be later than start time.")
+            else:
+                messages.success(request, "Quiz saved successfully.")
+                return redirect('class_manage', class_id=quiz.classroom.id)
+
+            return render(request, 'lms/add_question.html', {'quiz': quiz, 'questions': questions})
+
+    return render(request, 'lms/add_question.html', {'quiz': quiz, 'questions': questions})
+
+
+
+# =========================
+# STUDENT: VIEW QUIZZES
+# =========================
 @login_required
 def quizzes_student(request, class_id):
     classroom = get_object_or_404(Classroom, id=class_id)
-    quizzes = Quiz.objects.filter(classroom=classroom, visible=True).order_by('-deadline')
+
+    # Remove 'visible=True' unless you’re explicitly managing it from teacher panel
+    quizzes = Quiz.objects.filter(classroom=classroom, visible=True).order_by('start_time')
+
+    now = timezone.localtime(timezone.now())
     attempts = QuizAttempt.objects.filter(student=request.user, quiz__in=quizzes)
     attempt_map = {a.quiz.id: a for a in attempts}
-    now = timezone.now()
+
     return render(request, 'lms/quizzes_student.html', {
         'classroom': classroom,
         'quizzes': quizzes,
@@ -632,30 +816,89 @@ def quizzes_student(request, class_id):
     })
 
 
+
+# =========================
+# STUDENT: ATTEMPT QUIZ
+# =========================
 @login_required
 def attempt_quiz(request, quiz_id):
     quiz = get_object_or_404(Quiz, id=quiz_id)
-    if timezone.now() > quiz.deadline:
+    now = timezone.localtime(timezone.now())
+
+    # Restrict to quiz window
+    if now < quiz.start_time:
+        messages.error(request, "Quiz hasn’t started yet.")
+        return redirect('quizzes_student', class_id=quiz.classroom.id)
+
+    if now > quiz.end_time:
         messages.error(request, "Quiz deadline has passed.")
+        QuizAttempt.objects.get_or_create(
+            quiz=quiz,
+            student=request.user,
+            defaults={'score': 0.0, 'graded': True, 'auto_submitted': True}
+        )
+        return redirect('quizzes_student', class_id=quiz.classroom.id)
+
+    # Handle submission
+    if request.method == 'POST':
+        questions = quiz.questions.prefetch_related('options')
+        total_q = len(questions)
+        score = 0
+
+        for q in questions:
+            submitted = request.POST.getlist(str(q.id))
+            correct = list(q.options.filter(is_correct=True).values_list('id', flat=True))
+            if set(map(int, submitted)) == set(correct):
+                score += 1
+
+        final_score = round((score / total_q) * 10, 2)
+        QuizAttempt.objects.update_or_create(
+            quiz=quiz,
+            student=request.user,
+            defaults={'score': final_score, 'graded': True}
+        )
+
+        messages.success(request, f"Quiz submitted successfully! You scored {final_score}/10.")
         return redirect('class_quizzes_student', class_id=quiz.classroom.id)
 
-    if QuizAttempt.objects.filter(quiz=quiz, student=request.user).exists():
-        messages.warning(request, "You have already attempted this quiz.")
-        return redirect('class_quizzes_student', class_id=quiz.classroom.id)
+
+    questions = quiz.questions.prefetch_related('options')
+    return render(request, 'lms/attempt_quiz.html', {
+        'quiz': quiz,
+        'questions': questions
+    })
+
+
+# =========================
+# TEACHER: VIEW ATTEMPTS
+# =========================
+@login_required
+def view_attempts_teacher(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id, classroom__teacher=request.user)
+    attempts = QuizAttempt.objects.filter(quiz=quiz).select_related('student__profile')
 
     if request.method == 'POST':
-        questions = quiz.questions.all()
-        correct = 0
-        for q in questions:
-            ans = request.POST.get(str(q.id))
-            if ans and ans == q.correct_option:
-                correct += 1
-        score = round((correct / len(questions)) * 10, 2)
-        QuizAttempt.objects.create(quiz=quiz, student=request.user, score=score)
-        messages.success(request, f"Quiz submitted! You scored {score}/10.")
-        return redirect('class_quizzes_student', class_id=quiz.classroom.id)
+        # Update marks
+        if 'update_scores' in request.POST:
+            for attempt in attempts:
+                marks = request.POST.get(f'score_{attempt.id}')
+                if marks:
+                    attempt.score = float(marks)
+                    attempt.save()
+            messages.success(request, "Scores updated successfully.")
+            return redirect('view_attempts_teacher', quiz_id=quiz.id)
 
-    questions = quiz.questions.all()
-    return render(request, 'lms/attempt_quiz.html', {'quiz': quiz, 'questions': questions})
+        # Reactivate attempt
+        elif 'reactivate_attempt' in request.POST:
+            attempt_id = request.POST.get('attempt_id')
+            attempt = get_object_or_404(QuizAttempt, id=attempt_id, quiz=quiz)
+            attempt.delete()
+  # 👈 Remove previous attempt entirely
+            messages.success(request, f"Reactivated quiz for {attempt.student.username}. They can attempt again.")
+            return redirect('view_attempts_teacher', quiz_id=quiz.id)
+
+    return render(request, 'lms/view_attempts_teacher.html', {'quiz': quiz, 'attempts': attempts})
+
+
 
 

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert 
+           {% if message.tags == 'error' %}alert-danger
+           {% elif message.tags == 'success' %}alert-success
+           {% else %}alert-info{% endif %}
+           alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<div class="container mt-4">
+
+  <h3 class="text-light mb-4">Edit Quiz — {{ quiz.title }}</h3>
+
+  <!-- === Timing Form === -->
+  <form method="post" class="mb-4">
+    {% csrf_token %}
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label text-light">Start Time</label>
+        <input type="datetime-local" name="start_time" value="{{ quiz.start_time|date:'Y-m-d\\TH:i' }}" class="form-control bg-dark text-light border-secondary">
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label text-light">End Time</label>
+        <input type="datetime-local" name="end_time" value="{{ quiz.end_time|date:'Y-m-d\\TH:i' }}" class="form-control bg-dark text-light border-secondary">
+      </div>
+    </div>
+    <button type="submit" name="update_timing" class="btn btn-outline-warning w-100 mb-4">Update Timings</button>
+  </form>
+
+  <!-- === Question Form === -->
+  <form method="post" class="mb-4">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label text-light">Question</label>
+      <textarea name="question" class="form-control bg-dark text-light border-secondary" required></textarea>
+    </div>
+
+    {% for i in "1234" %}
+      <div class="input-group mb-2">
+        <div class="input-group-text bg-dark border-secondary">
+          {% if quiz.allow_multiple_correct %}
+            <input type="checkbox" name="correct_option" value="{{ forloop.counter0 }}" class="form-check-input mt-0">
+          {% else %}
+            <input type="radio" name="correct_option" value="{{ forloop.counter0 }}" class="form-check-input mt-0">
+          {% endif %}
+        </div>
+        <input type="text" name="option_text" placeholder="Option {{ forloop.counter }}" class="form-control bg-dark text-light border-secondary" required>
+      </div>
+    {% endfor %}
+
+    <button type="submit" name="add_question" class="btn btn-success w-100 mt-3">Add Question</button>
+  </form>
+
+  <!-- === Existing Questions === -->
+  <h5 class="text-light mb-3">Existing Questions</h5>
+  {% for q in questions %}
+    <div class="card mb-2 shadow-sm" style="background-color:#161b22;">
+      <div class="card-body">
+        <strong class="text-light">{{ forloop.counter }}. {{ q.text }}</strong>
+        <ul class="text-secondary mt-2 mb-0">
+          {% for opt in q.options.all %}
+            <li {% if opt.is_correct %}class="text-success"{% endif %}>{{ opt.text }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  {% empty %}
+    <p class="text-secondary">No questions added yet.</p>
+  {% endfor %}
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" name="save_quiz" class="btn btn-outline-info w-100 mt-4 mb-5">Save Quiz</button>
+  </form>
+
+</div>
+{% endblock %}
