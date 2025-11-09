@@ -88,8 +88,10 @@ class Assignment(models.Model):
     def __str__(self):
         return f"{self.title} ({self.classroom.code})"
 
-    def is_overdue(self):
-        return timezone.now() > self.deadline
+    @property
+    def is_active(self):
+        from django.utils import timezone
+        return self.deadline >= timezone.now()
 
 
 class Submission(models.Model):

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Submissions — {{ assignment.title }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">Submissions — {{ assignment.title }}</h4>
+
+  {% if submissions %}
+    <table class="table table-dark">
+      <thead><tr><th>Student</th><th>File</th><th>Submitted At</th><th>Marks</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for s in submissions %}
+          <tr>
+            <td>{{ s.student.username }}</td>
+            <td>
+              {% if s.file %}
+                <a href="{{ s.file.url }}" class="text-info">{{ s.file.name|slice:"-30:" }}</a>
+              {% else %}
+                <span class="text-secondary">No file</span>
+              {% endif %}
+            </td>
+            <td>{{ s.submitted_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if s.graded %}{{ s.marks }}{% else %}<span class="text-secondary">Not graded</span>{% endif %}</td>
+            <td>
+              <a href="{% url 'grade_submission' s.id %}" class="btn btn-sm btn-outline-success">Grade</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="text-secondary">No submissions yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

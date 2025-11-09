@@ -302,3 +302,127 @@ def clear_student_attendance(request, class_id, student_id):
 
     messages.warning(request, "Attendance can only be cleared via POST request.")
     return redirect('class_manage', class_id=classroom.id)
+
+from django.core.files.storage import FileSystemStorage
+
+# --------------------------------
+# ASSIGNMENTS
+# --------------------------------
+
+@login_required
+def add_assignment(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id, teacher=request.user)
+
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        desc = request.POST.get('description')
+        deadline = request.POST.get('deadline')
+
+        if not title or not deadline:
+            messages.error(request, "Title and deadline are required.")
+            return redirect('add_assignment', class_id=classroom.id)
+
+        Assignment.objects.create(
+            classroom=classroom,
+            title=title,
+            description=desc,
+            deadline=deadline
+        )
+        messages.success(request, "Assignment added successfully.")
+        return redirect('class_assignments_teacher', class_id=classroom.id)
+
+    return render(request, 'lms/add_assignment.html', {'classroom': classroom})
+
+
+@login_required
+def class_assignments_teacher(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id, teacher=request.user)
+    assignments = classroom.assignments.order_by('-created_at')
+
+    return render(request, 'lms/class_assignments_teacher.html', {
+        'classroom': classroom,
+        'assignments': assignments
+    })
+
+
+@login_required
+def class_assignments_student(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    assignments = classroom.assignments.filter(visible=True).order_by('-created_at')
+
+    # include submission info
+    submissions = Submission.objects.filter(student=request.user, assignment__in=assignments)
+    submission_map = {s.assignment.id: s for s in submissions}
+
+    return render(request, 'lms/class_assignments_student.html', {
+        'classroom': classroom,
+        'assignments': assignments,
+        'submission_map': submission_map,
+        'now': timezone.now(),
+    })
+
+
+@login_required
+def submit_assignment(request, assignment_id):
+    assignment = get_object_or_404(Assignment, id=assignment_id)
+    classroom = assignment.classroom
+    enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
+
+    if not enrollment:
+        messages.error(request, "You are not enrolled in this class.")
+        return redirect('main')
+
+    # Prevent submissions after the deadline
+    if timezone.now() > assignment.deadline:
+        messages.error(request, "The submission deadline has passed.")
+        return redirect('class_assignments_student', class_id=classroom.id)
+
+    if request.method == 'POST':
+        file = request.FILES.get('file')
+
+        if not file:
+            messages.error(request, "Please upload a file before submitting.")
+            return redirect('class_assignments_student', class_id=classroom.id)
+
+        # Save or update the submission
+        Submission.objects.update_or_create(
+            student=request.user,
+            assignment=assignment,
+            defaults={
+                'file': file,
+                'submitted_at': timezone.now()
+            }
+        )
+
+        messages.success(request, f"'{assignment.title}' submitted successfully.")
+        return redirect('class_assignments_student', class_id=classroom.id)
+
+    messages.error(request, "Invalid submission request.")
+    return redirect('class_assignments_student', class_id=classroom.id)
+
+
+
+@login_required
+def grade_submission(request, submission_id):
+    submission = get_object_or_404(Submission, id=submission_id, assignment__classroom__teacher=request.user)
+    
+    if request.method == 'POST':
+        marks = request.POST.get('marks')
+        submission.marks = float(marks)
+        submission.graded = True
+        submission.released = 'release' in request.POST
+        submission.save()
+        messages.success(request, f"Marks updated for {submission.student.username}.")
+        return redirect('view_submissions', assignment_id=submission.assignment.id)
+    
+    return render(request, 'lms/grade_submission.html', {'submission': submission})
+
+
+@login_required
+def view_submissions(request, assignment_id):
+    assignment = get_object_or_404(Assignment, id=assignment_id, classroom__teacher=request.user)
+    submissions = Submission.objects.filter(assignment=assignment).select_related('student')
+    return render(request, 'lms/view_submissions.html', {
+        'assignment': assignment,
+        'submissions': submissions,
+    })

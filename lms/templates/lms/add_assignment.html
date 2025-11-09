@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Add Assignment — {{ classroom.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">Add Assignment — {{ classroom.name }}</h4>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-2">
+      <input name="title" placeholder="Title" class="form-control bg-dark text-light border-secondary" required>
+    </div>
+    <div class="mb-2">
+      <textarea name="description" placeholder="Description" class="form-control bg-dark text-light border-secondary"></textarea>
+    </div>
+    <div class="mb-2">
+      <label class="text-secondary small mb-1">Deadline</label>
+      <input type="datetime-local" name="deadline" class="form-control bg-dark text-light border-secondary" required>
+    </div>
+    <button class="btn btn-primary">Add Assignment</button>
+  </form>
+</div>
+{% endblock %}

@@ -73,6 +73,16 @@
       </a>
     </div>
 
+    <!--Manage Assignments -->
+    <div class="card p-3 mb-4" style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+      <h5 class="text-light mb-3">Assignments</h5>
+      <p class="text-secondary mb-3">Manage assignments for this course.</p>
+      <div class="d-flex gap-2">
+        <a href="{% url 'add_assignment' classroom.id %}" class="btn btn-outline-primary w-50">Add</a>
+        <a href="{% url 'class_assignments_teacher' classroom.id %}" class="btn btn-outline-light w-50">View All</a>
+      </div>
+    </div>
+
     <!-- Enrolled Students -->
     <div class="card p-3 shadow-sm"
          style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">

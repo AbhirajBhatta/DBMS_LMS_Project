@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load dict_extras %}
+{% block title %}Assignments — {{ classroom.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">Assignments — {{ classroom.name }}</h4>
+
+  {% if assignments %}
+  <div class="list-group">
+    {% for a in assignments %}
+      <div class="list-group-item mb-3 p-3"
+           style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="mb-0 text-light">{{ a.title }}</h5>
+          <small class="text-secondary">
+            Due: {{ a.deadline|date:"Y-m-d H:i" }}
+          </small>
+        </div>
+        <p class="text-secondary mb-2">{{ a.description }}</p>
+
+        {% with submission=submissions|get_item:a.id %}
+          {% if submission %}
+            <p class="text-success mb-2">
+              ✅ Submitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
+            </p>
+            {% if submission.marks %}
+              <p class="text-info mb-2">
+                Marks: {{ submission.marks }} / {{ a.max_marks }}
+              </p>
+            {% endif %}
+          {% else %}
+            <p class="text-warning mb-2">⚠️ Not submitted yet.</p>
+          {% endif %}
+        {% endwith %}
+
+        <!-- File Upload Form -->
+        <form method="post" action="{% url 'submit_assignment' a.id %}" enctype="multipart/form-data" class="mt-3">
+          {% csrf_token %}
+          <div class="input-group">
+            <input type="file"
+                   name="file"
+                   class="form-control bg-dark text-light border-secondary"
+                   {% if a.deadline < now %}disabled{% endif %}
+                   required>
+            <button type="submit"
+                    class="btn btn-primary"
+                    {% if a.deadline < now %}disabled{% endif %}>
+              Submit
+            </button>
+          </div>
+          {% if a.deadline < now %}
+            <small class="text-danger d-block mt-2">Deadline has passed. Submissions are closed.</small>
+          {% endif %}
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+    <p class="text-secondary">No assignments yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

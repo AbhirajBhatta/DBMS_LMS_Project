@@ -15,5 +15,12 @@ urlpatterns = [
     path('class/<int:class_id>/remove/<int:enrollment_id>/', views.remove_student, name='remove_student'),
     # lms/urls.py
     path('class/<int:class_id>/clear_attendance/<int:student_id>/', views.clear_student_attendance, name='clear_student_attendance'),
+    # ASSIGNMENTS
+    path('class/<int:class_id>/assignments/add/', views.add_assignment, name='add_assignment'),
+    path('class/<int:class_id>/assignments/teacher/', views.class_assignments_teacher, name='class_assignments_teacher'),
+    path('class/<int:class_id>/assignments/student/', views.class_assignments_student, name='class_assignments_student'),
+    path('assignment/<int:assignment_id>/submit/', views.submit_assignment, name='submit_assignment'),
+    path('assignment/<int:assignment_id>/submissions/', views.view_submissions, name='view_submissions'),
+    path('submission/<int:submission_id>/grade/', views.grade_submission, name='grade_submission'),
 
 ]
