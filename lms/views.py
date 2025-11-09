@@ -6,7 +6,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db import IntegrityError
 from django.contrib import messages
 import csv, io
-from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment
+from django.db.models import Avg
+from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, QuizAttempt
 
 # Main dashboard (replaces old dashboard)
 @login_required
@@ -125,17 +126,16 @@ def upload_students_csv(request, class_id):
 
     return redirect('class_manage', class_id=class_id)
 
+
 @login_required
 def class_detail(request, class_id):
     classroom = get_object_or_404(Classroom, id=class_id)
     enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
 
-    # Placeholder demo data — you’ll later fetch from DB
-    attendance = enrollment.attendance_percent() if enrollment else 0
-    assignments = []  # Will later pull from Assignment model
-    quizzes = []      # Will later pull from Quiz model
-    grades = []       # Will later pull from Grade model
-    materials = []    # Will later pull from Resource model
+    # Compute attendance percentage
+    attendance = 0
+    if enrollment:
+        attendance = enrollment.attendance_percent()
 
     # Color logic for attendance
     if attendance < 75:
@@ -147,12 +147,29 @@ def class_detail(request, class_id):
     else:
         attendance_color = "success"
 
-    return render(request, "lms/class_detail.html", {
+    # ✅ NEW: Dynamic Grade Computation
+    assignment_avg = Submission.objects.filter(
+        student=request.user,
+        assignment__classroom=classroom,
+        graded=True,
+        released=True
+    ).aggregate(Avg('marks'))['marks__avg'] or 0
+
+    quiz_avg = QuizAttempt.objects.filter(
+        student=request.user,
+        quiz__classroom=classroom,
+        graded=True
+    ).aggregate(Avg('score'))['score__avg'] or 0
+
+    # Weighted grade (example: 60% assignments, 40% quizzes)
+    final_grade = round(0.6 * assignment_avg + 0.4 * quiz_avg, 2)
+
+    context = {
         "classroom": classroom,
         "attendance": attendance,
         "attendance_color": attendance_color,
-        "assignments": assignments,
-        "quizzes": quizzes,
-        "grades": grades,
-        "materials": materials,
-    })
+        "assignment_avg": round(assignment_avg, 2),
+        "quiz_avg": round(quiz_avg, 2),
+        "final_grade": final_grade,
+    }
+    return render(request, "lms/class_detail.html", context)

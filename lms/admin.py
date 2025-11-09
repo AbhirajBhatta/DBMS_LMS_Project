@@ -6,7 +6,6 @@ from .models import (
     Assignment,
     Submission,
     Attendance,
-    Grade,
     Quiz,
     QuizQuestion,
     QuizOption,
@@ -23,7 +22,6 @@ admin.site.register(Enrollment)
 admin.site.register(Assignment)
 admin.site.register(Submission)
 admin.site.register(Attendance)
-admin.site.register(Grade)
 admin.site.register(Quiz)
 admin.site.register(QuizQuestion)
 admin.site.register(QuizOption)

@@ -2,11 +2,14 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-# Profile model to extend User for roles (Student / Teacher)
+
+# -----------------------------
+# PROFILE (extends User)
+# -----------------------------
 class Profile(models.Model):
     ROLE_CHOICES = (('student', 'Student'), ('teacher', 'Teacher'))
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    reg_no = models.CharField(max_length=30, blank=True, null=True)  # for search
+    reg_no = models.CharField(max_length=30, blank=True, null=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES)
     department = models.CharField(max_length=100, blank=True, null=True)
     year = models.IntegerField(blank=True, null=True)
@@ -15,7 +18,9 @@ class Profile(models.Model):
         return f"{self.user.username} ({self.role})"
 
 
-# Classroom replaces Course for better LMS-like structure
+# -----------------------------
+# CLASSROOM
+# -----------------------------
 class Classroom(models.Model):
     name = models.CharField(max_length=200)
     code = models.CharField(max_length=50, unique=True)
@@ -27,7 +32,9 @@ class Classroom(models.Model):
         return f"{self.code} - {self.name}"
 
 
-# Student enrolls in a Classroom
+# -----------------------------
+# ENROLLMENT
+# -----------------------------
 class Enrollment(models.Model):
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments')
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='enrollments')
@@ -40,11 +47,36 @@ class Enrollment(models.Model):
         total_classes = self.attendance_records.count()
         if total_classes == 0:
             return 0.0
-        attended = self.attendance_records.filter(status='Present').count()
+        attended = self.attendance_records.filter(present=True).count()
         return round((attended / total_classes) * 100, 2)
 
+    def __str__(self):
+        return f"{self.student.username} → {self.classroom.code}"
 
-# Assignments linked to classrooms
+
+# -----------------------------
+# ATTENDANCE
+# -----------------------------
+class Attendance(models.Model):
+    enrollment = models.ForeignKey(
+        'Enrollment',
+        on_delete=models.CASCADE,
+        related_name='attendance_records'
+    )
+    date = models.DateField(default=timezone.now)
+    present = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('enrollment', 'date')
+
+    def __str__(self):
+        status = "Present" if self.present else "Absent"
+        return f"{self.enrollment.student.username} - {self.enrollment.classroom.code} ({status})"
+
+
+# -----------------------------
+# ASSIGNMENTS & SUBMISSIONS
+# -----------------------------
 class Assignment(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='assignments')
     title = models.CharField(max_length=200)
@@ -56,8 +88,10 @@ class Assignment(models.Model):
     def __str__(self):
         return f"{self.title} ({self.classroom.code})"
 
+    def is_overdue(self):
+        return timezone.now() > self.deadline
 
-# Submissions by students
+
 class Submission(models.Model):
     assignment = models.ForeignKey(Assignment, on_delete=models.CASCADE, related_name='submissions')
     student = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -74,37 +108,9 @@ class Submission(models.Model):
         return f"{self.student.username} - {self.assignment.title}"
 
 
-# Attendance tracking
-class Attendance(models.Model):
-    enrollment = models.ForeignKey(
-        'Enrollment',
-        on_delete=models.CASCADE,
-        related_name='attendance_records'
-    )
-    date = models.DateField()
-    present = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('enrollment', 'date')
-
-    def __str__(self):
-        status = "Present" if self.present else "Absent"
-        return f"{self.enrollment.student.username} - {self.enrollment.classroom.code} ({status})"
-
-
-
-# Grades for quizzes / assignments
-class Grade(models.Model):
-    student = models.ForeignKey(User, on_delete=models.CASCADE)
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE)
-    marks = models.FloatField()
-    graded_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.student.username} - {self.classroom.code}: {self.marks}"
-
-
-# Quizzes — auto-evaluable, teacher controlled
+# -----------------------------
+# QUIZ SYSTEM
+# -----------------------------
 class Quiz(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=200)
@@ -118,27 +124,24 @@ class Quiz(models.Model):
         return f"{self.title} ({self.classroom.code})"
 
 
-# Questions inside a quiz
 class QuizQuestion(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
     text = models.TextField()
     marks = models.IntegerField(default=1)
 
     def __str__(self):
-        return self.text[:50]
+        return f"Q{self.id}: {self.text[:40]}"
 
 
-# Options for each question
 class QuizOption(models.Model):
     question = models.ForeignKey(QuizQuestion, on_delete=models.CASCADE, related_name='options')
     text = models.CharField(max_length=500)
     is_correct = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.text
+        return f"{self.text[:50]}"
 
 
-# Attempted quiz record
 class QuizAttempt(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='attempts')
     student = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -155,18 +158,23 @@ class QuizAttempt(models.Model):
         return f"{self.student.username} - {self.quiz.title}"
 
 
-# Study materials
+# -----------------------------
+# STUDY MATERIALS
+# -----------------------------
 class Resource(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='resources')
     title = models.CharField(max_length=200)
-    file = models.FileField(upload_to='resources/')
+    file = models.FileField(upload_to='resources/', blank=True, null=True)
+    link = models.URLField(blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.title} ({self.classroom.code})"
 
 
-# Discussions and comments
+# -----------------------------
+# DISCUSSIONS + COMMENTS
+# -----------------------------
 class Discussion(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='discussions')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -186,7 +194,3 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"{self.author.username}: {self.content[:40]}"
-
-
-
-# Create your models here.

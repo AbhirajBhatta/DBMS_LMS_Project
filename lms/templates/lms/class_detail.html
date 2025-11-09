@@ -2,96 +2,159 @@
 {% block title %}{{ classroom.name }}{% endblock %}
 {% block content %}
 <div class="container mt-4">
-  <h3 class="fw-bold text-light mb-3">{{ classroom.name }} <span class="text-secondary">({{ classroom.code }})</span></h3>
+  <h3 class="fw-bold text-light mb-3">{{ classroom.name }} 
+    <span class="text-secondary">({{ classroom.code }})</span>
+  </h3>
   <p class="text-secondary">Instructor: {{ classroom.teacher.username }}</p>
 
+  <!-- Responsive Grid -->
   <div class="row row-cols-1 row-cols-md-3 g-4 mt-3">
-    
-    <!-- Attendance -->
-    <div class="col">
-      <div class="card text-center p-4 shadow-sm border-{{ attendance_color }}"
-           style="background-color:#161b22; border-width:2px;">
-        <h5 class="text-light mb-3">Attendance</h5>
-        <h2 class="fw-bold text-{{ attendance_color }}">{{ attendance }}%</h2>
+
+    <!-- Attendance Card -->
+    <div class="col d-flex">
+      <div class="card shadow-sm border-{{ attendance_color }} h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="card-title text-light mb-3 d-flex align-items-center">
+              <i class="bi bi-clipboard-check me-2 text-{{ attendance_color }}"></i> Attendance
+            </h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <small class="text-secondary">Overall</small>
+              <small class="fw-semibold text-{{ attendance_color }}">{{ attendance }}%</small>
+            </div>
+            <div class="progress" style="height: 10px; --attendance-width: {{ attendance }}%;">
+              <div class="progress-bar bg-{{ attendance_color }}"
+                   role="progressbar"
+                   style="width: var(--attendance-width);"
+                   aria-valuenow="{{ attendance }}"
+                   aria-valuemin="0"
+                   aria-valuemax="100">
+              </div>
+            </div>
+            <p class="mt-3 text-secondary small">
+              {% if attendance < 75 %}
+                <span class="text-danger">⚠ Low Attendance — risk of shortage</span>
+              {% elif attendance < 90 %}
+                <span class="text-warning">⚡ Keep it up — room to improve</span>
+              {% else %}
+                <span class="text-success">✅ Excellent consistency!</span>
+              {% endif %}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Assignments -->
-    <div class="col">
-      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
-        <h5 class="text-light mb-3">Assignments</h5>
-        {% if assignments %}
-          {% for a in assignments|slice:":3" %}
-            <div class="mb-2">
-              <p class="mb-0 text-light">{{ a.title }}</p>
-              <small class="text-secondary">Due {{ a.deadline }}</small>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="text-secondary">No assignments yet.</p>
-        {% endif %}
-        <a href="#" class="btn btn-outline-primary btn-sm mt-2">View All</a>
+    <!-- Assignments Card -->
+    <div class="col d-flex">
+      <div class="card shadow-sm h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="text-light mb-3">
+              <i class="bi bi-journal-text me-2 text-primary"></i> Assignments
+            </h5>
+            {% if assignments %}
+              {% for a in assignments|slice:":3" %}
+                <div class="mb-2">
+                  <p class="mb-0 text-light">{{ a.title }}</p>
+                  <small class="text-secondary">Due {{ a.deadline }}</small>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-secondary">No assignments yet.</p>
+            {% endif %}
+          </div>
+          <a href="#" class="btn btn-outline-primary btn-sm mt-3 w-100">View All</a>
+        </div>
       </div>
     </div>
 
-    <!-- Quizzes -->
-    <div class="col">
-      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
-        <h5 class="text-light mb-3">Quizzes</h5>
-        {% if quizzes %}
-          {% for q in quizzes|slice:":3" %}
-            <div class="mb-2">
-              <p class="mb-0 text-light">{{ q.title }}</p>
-              <small class="text-secondary">{{ q.status }}</small>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="text-secondary">No quizzes yet.</p>
-        {% endif %}
-        <a href="#" class="btn btn-outline-warning btn-sm mt-2">View All</a>
+    <!-- Quizzes Card -->
+    <div class="col d-flex">
+      <div class="card shadow-sm h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="text-light mb-3">
+              <i class="bi bi-question-circle me-2 text-warning"></i> Quizzes
+            </h5>
+            {% if quizzes %}
+              {% for q in quizzes|slice:":3" %}
+                <div class="mb-2">
+                  <p class="mb-0 text-light">{{ q.title }}</p>
+                  <small class="text-secondary">{{ q.status }}</small>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-secondary">No quizzes yet.</p>
+            {% endif %}
+          </div>
+          <a href="#" class="btn btn-outline-warning btn-sm mt-3 w-100">View All</a>
+        </div>
       </div>
     </div>
 
-    <!-- Grades -->
-    <div class="col">
-      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
-        <h5 class="text-light mb-3">Grades</h5>
-        {% if grades %}
-          {% for g in grades|slice:":3" %}
-            <div class="mb-1 text-light">
-              {{ g.item_name }} — {{ g.score }}/10
+    <!-- Grades Overview Card -->
+    <div class="col d-flex">
+      <div class="card shadow-sm border-success h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="card-title text-light mb-3">
+              <i class="bi bi-bar-chart-fill me-2 text-success"></i> Grades Overview
+            </h5>
+            <div class="text-secondary small mb-2">
+              <p class="mb-1">Assignments Avg: <span class="text-light">{{ assignment_avg }}/10</span></p>
+              <p class="mb-2">Quizzes Avg: <span class="text-light">{{ quiz_avg }}/10</span></p>
             </div>
-          {% endfor %}
-        {% else %}
-          <p class="text-secondary">No grades released yet.</p>
-        {% endif %}
-        <a href="#" class="btn btn-outline-success btn-sm mt-2">View All</a>
+          </div>
+          <div>
+            <div class="border-top border-secondary my-3"></div>
+            <h6 class="fw-semibold text-light">
+              Final Weighted Grade:
+              <span class="text-success">{{ final_grade }}/10</span>
+            </h6>
+            <a href="#" class="btn btn-outline-success btn-sm w-100 mt-2">
+              View Detailed Grades
+            </a>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Materials -->
-    <div class="col">
-      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
-        <h5 class="text-light mb-3">Course Materials</h5>
-        {% if materials %}
-          {% for m in materials|slice:":3" %}
-            <div class="mb-1">
-              <a href="{{ m.file.url }}" class="text-info text-decoration-none">{{ m.title }}</a>
-            </div>
-          {% endfor %}
-        {% else %}
-          <p class="text-secondary">No materials uploaded yet.</p>
-        {% endif %}
-        <a href="#" class="btn btn-outline-info btn-sm mt-2">View All</a>
+    <!-- Course Materials -->
+    <div class="col d-flex">
+      <div class="card shadow-sm h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="text-light mb-3">
+              <i class="bi bi-folder2-open me-2 text-info"></i> Course Materials
+            </h5>
+            {% if materials %}
+              {% for m in materials|slice:":3" %}
+                <div class="mb-1">
+                  <a href="{{ m.file.url }}" class="text-info text-decoration-none">{{ m.title }}</a>
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-secondary">No materials uploaded yet.</p>
+            {% endif %}
+          </div>
+          <a href="#" class="btn btn-outline-info btn-sm w-100 mt-3">View All</a>
+        </div>
       </div>
     </div>
 
     <!-- Discussions -->
-    <div class="col">
-      <div class="card p-4 shadow-sm" style="background-color:#161b22;">
-        <h5 class="text-light mb-3">Discussions</h5>
-        <p class="text-secondary">Join the latest class discussions posted by your instructor.</p>
-        <a href="#" class="btn btn-outline-light btn-sm mt-2">Open Discussions</a>
+    <div class="col d-flex">
+      <div class="card shadow-sm h-100 flex-fill" style="background-color:#161b22;">
+        <div class="card-body d-flex flex-column justify-content-between">
+          <div>
+            <h5 class="text-light mb-3">
+              <i class="bi bi-chat-dots me-2 text-light"></i> Discussions
+            </h5>
+            <p class="text-secondary">Join the latest class discussions posted by your instructor.</p>
+          </div>
+          <a href="#" class="btn btn-outline-light btn-sm w-100 mt-3">Open Discussions</a>
+        </div>
       </div>
     </div>
 
