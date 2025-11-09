@@ -7,11 +7,13 @@ from django.db import IntegrityError
 from django.contrib import messages
 import csv, io
 from django.db.models import Avg
-from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, QuizAttempt, Attendance
+from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, QuizAttempt, Attendance, SubmissionHistory
 from datetime import date, datetime
 from django.utils.dateformat import DateFormat
 from django.utils import timezone
 from django.contrib import messages
+from .forms import AssignmentForm
+
 
 # Main dashboard (replaces old dashboard)
 @login_required
@@ -147,51 +149,132 @@ def upload_students_csv(request, class_id):
     return redirect('class_manage', class_id=class_id)
 
 
+
 @login_required
 def class_detail(request, class_id):
     classroom = get_object_or_404(Classroom, id=class_id)
-    enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
+    is_teacher = classroom.teacher == request.user
+    now = timezone.now()
 
-    # Compute attendance percentage
-    attendance = 0
-    if enrollment:
-        attendance = enrollment.attendance_percent()
+    # Fetch enrollments, needed for attendance percent when student views
+    enrollment = None
+    if not is_teacher:
+        enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
 
-    # Color logic for attendance
-    if attendance < 75:
-        attendance_color = "danger"
-    elif attendance < 80:
-        attendance_color = "warning"
-    elif attendance < 90:
-        attendance_color = "info"
+    # Fetch assignments visible for this class
+    assignments = Assignment.objects.filter(classroom=classroom, visible=True).order_by('deadline')
+
+    # === AUTO-MARK MISSED ASSIGNMENTS AS 0 ===
+    # (Only for students; teacher view shouldn't create these)
+    if not is_teacher and enrollment:
+        student = request.user
+        for a in assignments:
+            has_submitted = Submission.objects.filter(student=student, assignment=a).exists()
+            if not has_submitted and a.deadline < now:
+                # create/ensure a 0-mark submission (graded & released so it counts)
+                Submission.objects.update_or_create(
+                    student=student,
+                    assignment=a,
+                    defaults={
+                        'marks': 0.0,
+                        'graded': True,
+                        'released': True,
+                        'submitted_at': a.deadline
+                    }
+                )
+
+    # === BUILD submission_map FOR QUICK LOOKUP ===
+    if not is_teacher:
+        submissions = Submission.objects.filter(student=request.user, assignment__in=assignments)
+        submission_map = {s.assignment.id: s for s in submissions}
     else:
-        attendance_color = "success"
+        submission_map = {}
 
-    # ✅ NEW: Dynamic Grade Computation
-    assignment_avg = Submission.objects.filter(
-        student=request.user,
-        assignment__classroom=classroom,
-        graded=True,
-        released=True
-    ).aggregate(Avg('marks'))['marks__avg'] or 0
+    # === PENDING ASSIGNMENTS COUNT (not yet submitted and not past deadline) ===
+    pending_assignments = 0
+    if not is_teacher:
+        for a in assignments:
+            sub = submission_map.get(a.id)
+            if not sub and a.deadline > now:
+                pending_assignments += 1
 
+    # === ATTENDANCE PERCENTAGE (student only) ===
+    attendance = 0
+    attendance_color = "success"
+    if enrollment:
+        try:
+            attendance = enrollment.attendance_percent()
+        except Exception:
+            attendance = 0
+
+        if attendance < 75:
+            attendance_color = "danger"
+        elif attendance < 80:
+            attendance_color = "warning"
+        elif attendance < 90:
+            attendance_color = "info"
+        else:
+            attendance_color = "success"
+
+    # === ASSIGNMENT & QUIZ AVERAGES (use the same logic you used earlier) ===
+    # Assignment average: only consider submissions that are graded & released
+    student = request.user if not is_teacher else None
+    total_assignments = assignments.count()
+
+    if not is_teacher and total_assignments > 0:
+        # Get all submissions (including 0-mark auto-graded)
+        subs = Submission.objects.filter(
+            student=student,
+            assignment__classroom=classroom
+        )
+
+        # Sum marks for all submissions; treat missing as 0
+        total_marks = sum(s.marks or 0 for s in subs)
+        submitted_count = subs.count()
+
+        # If student hasn’t submitted for some assignments yet (and deadline not over),
+        # include them as 0 so the average is over total assignments
+        assignment_avg = round(total_marks / total_assignments, 2)
+    else:
+        assignment_avg = 0
+
+    # Quiz average: same approach as before (if you track graded/quizzes)
     quiz_avg = QuizAttempt.objects.filter(
         student=request.user,
         quiz__classroom=classroom,
         graded=True
     ).aggregate(Avg('score'))['score__avg'] or 0
 
-    # Weighted grade (example: 60% assignments, 40% quizzes)
-    final_grade = round(0.6 * assignment_avg + 0.4 * quiz_avg, 2)
+    # final weighted grade (same weights as previous code: 60% assignments, 40% quizzes)
+    quiz_avg = 0
+    final_grade = round(0.5 * assignment_avg + 0.5 * quiz_avg, 2) 
+
+    # Count overdue auto-zeros (useful display)
+    overdue_zeros = 0
+    if not is_teacher:
+        overdue_zeros = Submission.objects.filter(
+            student=request.user,
+            assignment__classroom=classroom,
+            marks=0,
+            graded=True,
+            submitted_at__lte=now
+        ).count()
 
     context = {
         "classroom": classroom,
-        "attendance": attendance,
+        "assignments": assignments,
+        "attendance": round(attendance, 2),
         "attendance_color": attendance_color,
         "assignment_avg": round(assignment_avg, 2),
         "quiz_avg": round(quiz_avg, 2),
         "final_grade": final_grade,
+        "pending_assignments": pending_assignments,
+        "submission_map": submission_map,
+        "is_teacher": is_teacher,
+        "now": now,
+        "overdue_zeros": overdue_zeros,
     }
+
     return render(request, "lms/class_detail.html", context)
 
 
@@ -309,29 +392,28 @@ from django.core.files.storage import FileSystemStorage
 # ASSIGNMENTS
 # --------------------------------
 
+# Teacher: Add Assignment
 @login_required
 def add_assignment(request, class_id):
-    classroom = get_object_or_404(Classroom, id=class_id, teacher=request.user)
+    classroom = get_object_or_404(Classroom, id=class_id)
 
     if request.method == 'POST':
-        title = request.POST.get('title')
-        desc = request.POST.get('description')
-        deadline = request.POST.get('deadline')
+        form = AssignmentForm(request.POST, request.FILES)
+        if form.is_valid():
+            assignment = form.save(commit=False)
+            assignment.classroom = classroom
+            assignment.save()
+            messages.success(request, '✅ Assignment added successfully.')
+            return redirect('class_assignments_teacher', class_id=classroom.id)
+        else:
+            messages.error(request, '⚠️ Please correct the errors below.')
+    else:
+        form = AssignmentForm()
 
-        if not title or not deadline:
-            messages.error(request, "Title and deadline are required.")
-            return redirect('add_assignment', class_id=classroom.id)
-
-        Assignment.objects.create(
-            classroom=classroom,
-            title=title,
-            description=desc,
-            deadline=deadline
-        )
-        messages.success(request, "Assignment added successfully.")
-        return redirect('class_assignments_teacher', class_id=classroom.id)
-
-    return render(request, 'lms/add_assignment.html', {'classroom': classroom})
+    return render(request, 'lms/add_assignment.html', {
+        'form': form,
+        'classroom': classroom
+    })
 
 
 @login_required
@@ -348,57 +430,82 @@ def class_assignments_teacher(request, class_id):
 @login_required
 def class_assignments_student(request, class_id):
     classroom = get_object_or_404(Classroom, id=class_id)
-    assignments = classroom.assignments.filter(visible=True).order_by('-created_at')
+    enroll = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
+    if not enroll:
+        messages.error(request, "You are not enrolled in this class.")
+        return redirect('main')
 
-    # include submission info
+    assignments = Assignment.objects.filter(classroom=classroom).order_by('-deadline')
     submissions = Submission.objects.filter(student=request.user, assignment__in=assignments)
     submission_map = {s.assignment.id: s for s in submissions}
 
-    return render(request, 'lms/class_assignments_student.html', {
+    context = {
         'classroom': classroom,
         'assignments': assignments,
-        'submission_map': submission_map,
+        'submissions': submission_map,
         'now': timezone.now(),
-    })
+    }
+    return render(request, 'lms/class_assignments_student.html', context)
+
 
 
 @login_required
 def submit_assignment(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
     classroom = assignment.classroom
-    enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
 
+    # Ensure the student is enrolled
+    enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
     if not enrollment:
         messages.error(request, "You are not enrolled in this class.")
         return redirect('main')
 
-    # Prevent submissions after the deadline
+    # Block submissions after deadline
     if timezone.now() > assignment.deadline:
-        messages.error(request, "The submission deadline has passed.")
+        messages.error(request, "⛔ Deadline has passed. Submissions are closed.")
         return redirect('class_assignments_student', class_id=classroom.id)
 
-    if request.method == 'POST':
-        file = request.FILES.get('file')
-
-        if not file:
-            messages.error(request, "Please upload a file before submitting.")
-            return redirect('class_assignments_student', class_id=classroom.id)
-
-        # Save or update the submission
-        Submission.objects.update_or_create(
-            student=request.user,
-            assignment=assignment,
-            defaults={
-                'file': file,
-                'submitted_at': timezone.now()
-            }
-        )
-
-        messages.success(request, f"'{assignment.title}' submitted successfully.")
+    # Only allow POST requests with a file
+    if request.method != 'POST' or 'file' not in request.FILES:
+        messages.error(request, "⚠️ Invalid submission request.")
         return redirect('class_assignments_student', class_id=classroom.id)
 
-    messages.error(request, "Invalid submission request.")
+    file = request.FILES['file']
+
+    # File validation
+    if not file.name.lower().endswith('.pdf'):
+        messages.error(request, "❌ Only PDF files are allowed.")
+        return redirect('class_assignments_student', class_id=classroom.id)
+
+    if file.size > 5 * 1024 * 1024:  # 5 MB
+        messages.error(request, "❌ File size cannot exceed 5 MB.")
+        return redirect('class_assignments_student', class_id=classroom.id)
+
+    # Save or update submission
+    submission, created = Submission.objects.update_or_create(
+        student=request.user,
+        assignment=assignment,
+        defaults={
+            'file': file,
+            'submitted_at': timezone.now(),
+        }
+    )
+
+    # Track submission history
+    SubmissionHistory.objects.create(
+        submission=submission,
+        submitted_at=timezone.now(),
+        action='created' if created else 'resubmitted'
+    )
+
+    # Display feedback message
+    if created:
+        messages.success(request, "✅ Assignment submitted successfully.")
+    else:
+        messages.success(request, "🔁 Resubmitted successfully (previous file replaced).")
+
     return redirect('class_assignments_student', class_id=classroom.id)
+
 
 
 
@@ -426,3 +533,28 @@ def view_submissions(request, assignment_id):
         'assignment': assignment,
         'submissions': submissions,
     })
+
+# Teacher: Edit Assignment
+@login_required
+def edit_assignment(request, assignment_id):
+    assignment = get_object_or_404(Assignment, id=assignment_id)
+    classroom = assignment.classroom
+
+    if request.method == 'POST':
+        form = AssignmentForm(request.POST, request.FILES, instance=assignment)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '✅ Assignment updated successfully.')
+            return redirect('class_assignments_teacher', class_id=classroom.id)
+        else:
+            messages.error(request, '⚠️ Please correct the errors below.')
+    else:
+        form = AssignmentForm(instance=assignment)
+
+    return render(request, 'lms/edit_assignment.html', {
+        'form': form,
+        'assignment': assignment,
+        'classroom': classroom
+    })
+
+

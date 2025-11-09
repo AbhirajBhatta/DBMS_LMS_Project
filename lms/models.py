@@ -84,14 +84,26 @@ class Assignment(models.Model):
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     visible = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # 👇 New field: Teacher’s question file (optional)
+    attachment = models.FileField(
+        upload_to='assignments/',
+        blank=True,
+        null=True,
+        help_text="Optional PDF or image of the assignment question."
+    )
 
     def __str__(self):
         return f"{self.title} ({self.classroom.code})"
 
     @property
     def is_active(self):
-        from django.utils import timezone
         return self.deadline >= timezone.now()
+
+    @property
+    def is_past_due(self):
+        return self.deadline < timezone.now()
 
 
 class Submission(models.Model):
@@ -103,11 +115,38 @@ class Submission(models.Model):
     graded = models.BooleanField(default=False)
     released = models.BooleanField(default=False)
 
+    # ✅ Track resubmissions (each update overwrites file, but timestamp gets stored separately)
+    last_resubmitted_at = models.DateTimeField(blank=True, null=True)
+
     class Meta:
         unique_together = ('assignment', 'student')
 
     def __str__(self):
         return f"{self.student.username} - {self.assignment.title}"
+
+    def is_late(self):
+        """Return True if the submission was made after the assignment deadline."""
+        return self.submitted_at > self.assignment.deadline
+
+    def can_resubmit(self):
+        """Check if student is still allowed to resubmit."""
+        return timezone.now() <= self.assignment.deadline
+
+
+class SubmissionHistory(models.Model):
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='history')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.submission.student.username} - {self.submission.assignment.title} @ {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+    
+class SubmissionHistory(models.Model):
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='history')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=20, default='submitted')
+    
+    def __str__(self):
+        return f"History for {self.submission.student.username} on {self.submission.assignment.title}"
 
 
 # -----------------------------

@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
-{% block title %}Add Assignment — {{ classroom.name }}{% endblock %}
+{% block title %}Edit Assignment — {{ assignment.title }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4 text-light">
-  <h4 class="mb-3">Add Assignment — {{ classroom.name }}</h4>
+  <h4 class="mb-3">Edit Assignment — {{ classroom.name }}</h4>
 
   <form method="post" enctype="multipart/form-data" class="p-3 rounded-3" 
         style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
     {% csrf_token %}
     {{ form.non_field_errors }}
-    
+
     <div class="mb-3">
       <label class="form-label text-secondary">Title</label>
       {{ form.title.errors }}
@@ -29,15 +29,20 @@
     </div>
     
     <div class="mb-3">
-      <label class="form-label text-secondary">Attach PDF/Image (optional)</label>
+      <label class="form-label text-secondary">Attachment</label>
       {{ form.attachment.errors }}
       {{ form.attachment }}
-      <small class="text-secondary d-block mt-1">
-        Allowed: PDF, PNG, JPG — Max 5 MB
-      </small>
+      {% if assignment.attachment %}
+        <p class="text-info mt-2">
+          📎 Current File: <a href="{{ assignment.attachment.url }}" target="_blank" class="text-info">
+            {{ assignment.attachment.name|slice:"-40:" }}
+          </a>
+        </p>
+      {% endif %}
+      <small class="text-secondary d-block mt-1">Allowed: PDF, PNG, JPG — Max 5 MB</small>
     </div>
 
-    <button type="submit" class="btn btn-primary mt-3">Add Assignment</button>
+    <button type="submit" class="btn btn-success mt-3">Update Assignment</button>
   </form>
 </div>
 {% endblock %}

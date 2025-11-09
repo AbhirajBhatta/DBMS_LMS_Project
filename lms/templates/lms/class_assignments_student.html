@@ -9,6 +9,7 @@
   {% if assignments %}
   <div class="list-group">
     {% for a in assignments %}
+      {% with submission=submissions|get_item:a.id %}
       <div class="list-group-item mb-3 p-3"
            style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -17,43 +18,48 @@
             Due: {{ a.deadline|date:"Y-m-d H:i" }}
           </small>
         </div>
+
         <p class="text-secondary mb-2">{{ a.description }}</p>
 
-        {% with submission=submissions|get_item:a.id %}
-          {% if submission %}
-            <p class="text-success mb-2">
-              ✅ Submitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
-            </p>
-            {% if submission.marks %}
-              <p class="text-info mb-2">
-                Marks: {{ submission.marks }} / {{ a.max_marks }}
-              </p>
-            {% endif %}
-          {% else %}
-            <p class="text-warning mb-2">⚠️ Not submitted yet.</p>
-          {% endif %}
-        {% endwith %}
+        {% if a.attachment %}
+          <p class="mb-2">
+            📎 <a href="{{ a.attachment.url }}" target="_blank" class="text-info">
+              View Attached Question ({{ a.attachment.name|slice:"-40:" }})
+            </a>
+          </p>
+        {% endif %}
 
-        <!-- File Upload Form -->
-        <form method="post" action="{% url 'submit_assignment' a.id %}" enctype="multipart/form-data" class="mt-3">
+        {% if submission %}
+          <div class="alert alert-success py-2 mb-2" style="background:#112d18; border:none; color:#8ef58e;">
+            ✅ Submitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
+            {% if submission.marks %}
+              <br><span class="text-info">Marks: {{ submission.marks }}</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="alert alert-warning py-2 mb-2" style="background:#3b2a00; border:none; color:#ffcc66;">
+            ⚠️ Not submitted yet.
+          </div>
+        {% endif %}
+
+        {% if a.deadline > now %}
+        <form method="post" action="{% url 'submit_assignment' a.id %}" enctype="multipart/form-data" class="mt-2">
           {% csrf_token %}
           <div class="input-group">
             <input type="file"
                    name="file"
+                   accept=".pdf"
                    class="form-control bg-dark text-light border-secondary"
-                   {% if a.deadline < now %}disabled{% endif %}
                    required>
-            <button type="submit"
-                    class="btn btn-primary"
-                    {% if a.deadline < now %}disabled{% endif %}>
-              Submit
-            </button>
+            <button type="submit" class="btn btn-primary">Submit</button>
           </div>
-          {% if a.deadline < now %}
-            <small class="text-danger d-block mt-2">Deadline has passed. Submissions are closed.</small>
-          {% endif %}
+          <small class="text-secondary d-block mt-1">Only PDF files allowed, max size 5 MB.</small>
         </form>
+        {% else %}
+          <small class="text-danger">Deadline has passed. Submissions closed.</small>
+        {% endif %}
       </div>
+      {% endwith %}
     {% endfor %}
   </div>
 

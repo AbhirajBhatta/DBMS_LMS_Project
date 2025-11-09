@@ -50,21 +50,28 @@
     </div>
 
     <!-- Assignments Card -->
-    <div class="card p-3" style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
-      <h5 class="text-light mb-2">Assignments</h5>
+    <div class="card border-0 bg-dark text-light p-3 shadow-sm">
+      <h5>Assignments</h5>
+
       {% if assignments %}
-        <ul class="list-unstyled mb-2">
-          {% for a in assignments %}
-            <li class="text-secondary mb-1">
-              {{ a.title }} — <small>{{ a.deadline|date:"Y-m-d" }}</small>
-            </li>
-          {% endfor %}
-        </ul>
+        {% if pending_assignments > 0 %}
+          <p class="text-warning mb-2">
+            ⚠️ {{ pending_assignments }} assignment{{ pending_assignments|pluralize:"s" }} due soon.
+          </p>
+        {% else %}
+          <p class="text-success mb-2">✅ All assignments submitted!</p>
+        {% endif %}
       {% else %}
-        <p class="text-secondary mb-2">No assignments yet.</p>
+        <p class="text-secondary mb-2">No assignments created yet.</p>
       {% endif %}
-      <a href="{% url 'class_assignments_student' classroom.id %}" class="btn btn-outline-primary btn-sm w-100">View All</a>
+
+      <a href="{% if is_teacher %}{% url 'class_assignments_teacher' classroom.id %}
+              {% else %}{% url 'class_assignments_student' classroom.id %}{% endif %}"
+        class="btn btn-outline-primary btn-sm mt-2">
+        View All
+      </a>
     </div>
+
 
     <!-- Quizzes Card -->
     <div class="col d-flex">
@@ -98,11 +105,25 @@
             <h5 class="card-title text-light mb-3">
               <i class="bi bi-bar-chart-fill me-2 text-success"></i> Grades Overview
             </h5>
+
             <div class="text-secondary small mb-2">
-              <p class="mb-1">Assignments Avg: <span class="text-light">{{ assignment_avg }}/10</span></p>
-              <p class="mb-2">Quizzes Avg: <span class="text-light">{{ quiz_avg }}/10</span></p>
+              <p class="mb-1">
+                Assignments Avg:
+                <span class="text-light">{{ assignment_avg }}/10</span>
+              </p>
+              <p class="mb-2">
+                Quizzes Avg:
+                <span class="text-light">{{ quiz_avg }}/10</span>
+              </p>
+
+              {% if overdue_zeros > 0 %}
+                <p class="text-danger fw-semibold mb-2">
+                  ⚠️ {{ overdue_zeros }} overdue assignment{{ overdue_zeros|pluralize }} (auto-graded as 0)
+                </p>
+              {% endif %}
             </div>
           </div>
+
           <div>
             <div class="border-top border-secondary my-3"></div>
             <h6 class="fw-semibold text-light">
@@ -116,6 +137,7 @@
         </div>
       </div>
     </div>
+
 
     <!-- Course Materials -->
     <div class="col d-flex">
