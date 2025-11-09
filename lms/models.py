@@ -143,10 +143,10 @@ class SubmissionHistory(models.Model):
 class SubmissionHistory(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='history')
     timestamp = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=20, default='submitted')
-    
+    action = models.CharField(max_length=20, default='Submitted')
+
     def __str__(self):
-        return f"History for {self.submission.student.username} on {self.submission.assignment.title}"
+        return f"{self.submission.student.username} - {self.action} @ {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
 
 # -----------------------------

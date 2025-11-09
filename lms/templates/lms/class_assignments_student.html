@@ -29,18 +29,29 @@
           </p>
         {% endif %}
 
-        {% if submission %}
-          <div class="alert alert-success py-2 mb-2" style="background:#112d18; border:none; color:#8ef58e;">
-            ✅ Submitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
-            {% if submission.marks %}
-              <br><span class="text-info">Marks: {{ submission.marks }}</span>
+        {% with submission=submissions|get_item:a.id %}
+            {% if submission %}
+                <div class="mb-2 p-2 rounded" style="background-color:#033a00;">
+                <p class="text-success mb-1">
+                    ✅ {% if submission.history.count > 1 %}
+                    Resubmitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
+                    <small class="text-secondary">(Total {{ submission.history.count }} submissions)</small>
+                    {% else %}
+                    Submitted on {{ submission.submitted_at|date:"Y-m-d H:i" }}
+                    {% endif %}
+                </p>
+                {% if submission.marks is not None %}
+                    <p class="text-info mb-1">Marks: {{ submission.marks }}</p>
+                {% endif %}
+                {% if submission and submission.marks == 0 and submission.graded %}
+                <p class="text-danger mb-1">⚠️ Deadline missed — Auto-graded as 0.</p>
+                {% endif %}
+                </div>
+            {% else %}
+                <p class="text-warning mb-2">⚠️ Not submitted yet.</p>
             {% endif %}
-          </div>
-        {% else %}
-          <div class="alert alert-warning py-2 mb-2" style="background:#3b2a00; border:none; color:#ffcc66;">
-            ⚠️ Not submitted yet.
-          </div>
-        {% endif %}
+        {% endwith %}
+
 
         {% if a.deadline > now %}
         <form method="post" action="{% url 'submit_assignment' a.id %}" enctype="multipart/form-data" class="mt-2">

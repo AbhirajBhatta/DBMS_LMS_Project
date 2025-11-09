@@ -5,14 +5,11 @@
 <div class="container mt-4">
   <h4 class="text-light mb-3">Submissions — {{ assignment.title }}</h4>
 
-  <input type="text"
-         id="search"
-         class="form-control bg-dark text-light border-secondary mb-3"
-         placeholder="🔍 Search by register number...">
+  <input type="text" id="search" class="form-control bg-dark text-light border-secondary mb-3"
+         placeholder="Search by register number...">
 
-  {% if submissions %}
-  <table class="table table-dark table-striped align-middle text-center">
-    <thead class="table-secondary text-dark">
+  <table class="table table-dark table-hover">
+    <thead>
       <tr>
         <th>Student</th>
         <th>Register No</th>
@@ -26,48 +23,37 @@
     <tbody id="submissionTable">
       {% for s in submissions %}
       <tr>
-        <td class="fw-semibold text-light">{{ s.student.username }}</td>
-        <td class="text-secondary">{{ s.student.profile.reg_no }}</td>
-
+        <td>{{ s.student.username }}</td>
+        <td>{{ s.student.profile.reg_no }}</td>
         <td>
           {% if s.file %}
-            <a href="{{ s.file.url }}" target="_blank" class="text-info text-decoration-none">
-              {{ s.file.name|slice:"-40:" }}
-            </a>
+            <a href="{{ s.file.url }}" target="_blank" class="text-info">{{ s.file.name|slice:"-25:" }}</a>
           {% else %}
             <span class="text-secondary">No file</span>
           {% endif %}
         </td>
-
-        <td class="text-light">{{ s.submitted_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ s.submitted_at|date:"Y-m-d H:i" }}</td>
 
         <td>
           {% if s.history.all %}
-            <details>
-              <summary class="text-info">
-                {{ s.history.count }} time{{ s.history.count|pluralize }}
-              </summary>
-              <ul class="list-unstyled small mt-2 mb-0">
-                {% for h in s.history.all %}
-                  <li class="text-secondary">
-                    • {{ h.action|title }} on {{ h.submitted_at|date:"Y-m-d H:i" }}
-                  </li>
-                {% endfor %}
-              </ul>
-            </details>
+            <span class="text-info">↓ {{ s.history.count }} times</span>
+            <ul class="mt-2 mb-0 ps-3 small text-secondary" style="list-style:none;">
+              {% for h in s.history.all|dictsortreversed:"timestamp" %}
+                <li>
+                  {% if h.action == "Resubmission" %}
+                    🔁 Resubmitted — {{ h.timestamp|date:"Y-m-d H:i" }}
+                  {% else %}
+                    ✅ Submitted — {{ h.timestamp|date:"Y-m-d H:i" }}
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
           {% else %}
-            <span class="text-secondary">-</span>
+            <span class="text-muted">No history</span>
           {% endif %}
         </td>
 
-        <td>
-          {% if s.marks %}
-            <span class="text-success fw-bold">{{ s.marks }}</span>
-          {% else %}
-            <span class="text-secondary">-</span>
-          {% endif %}
-        </td>
-
+        <td>{{ s.marks|default:"-" }}</td>
         <td>
           <a href="{% url 'grade_submission' s.id %}" class="btn btn-sm btn-success">Grade</a>
         </td>
@@ -75,21 +61,16 @@
       {% endfor %}
     </tbody>
   </table>
-
-  {% else %}
-    <p class="text-secondary">No submissions yet.</p>
-  {% endif %}
 </div>
 
 <script>
-// Simple client-side search by Register Number
 const search = document.getElementById('search');
 search.addEventListener('keyup', function() {
-  const filter = this.value.toLowerCase();
-  const rows = document.querySelectorAll('#submissionTable tr');
+  let filter = this.value.toLowerCase();
+  let rows = document.querySelectorAll('#submissionTable tr');
   rows.forEach(r => {
-    const regNo = r.children[1].textContent.toLowerCase();
-    r.style.display = regNo.includes(filter) ? '' : 'none';
+    let text = r.children[1].textContent.toLowerCase();
+    r.style.display = text.includes(filter) ? '' : 'none';
   });
 });
 </script>

@@ -154,24 +154,29 @@ def upload_students_csv(request, class_id):
 def class_detail(request, class_id):
     classroom = get_object_or_404(Classroom, id=class_id)
     is_teacher = classroom.teacher == request.user
-    now = timezone.now()
+    now = timezone.localtime(timezone.now())  # localized to IST
 
-    # Fetch enrollments, needed for attendance percent when student views
+    # === Enrollment for Attendance ===
     enrollment = None
     if not is_teacher:
         enrollment = Enrollment.objects.filter(student=request.user, classroom=classroom).first()
 
-    # Fetch assignments visible for this class
+    # === Fetch Visible Assignments ===
     assignments = Assignment.objects.filter(classroom=classroom, visible=True).order_by('deadline')
 
-    # === AUTO-MARK MISSED ASSIGNMENTS AS 0 ===
-    # (Only for students; teacher view shouldn't create these)
+    # === AUTO-MARK / CLEANUP LOGIC ===
     if not is_teacher and enrollment:
         student = request.user
         for a in assignments:
-            has_submitted = Submission.objects.filter(student=student, assignment=a).exists()
-            if not has_submitted and a.deadline < now:
-                # create/ensure a 0-mark submission (graded & released so it counts)
+            sub = Submission.objects.filter(student=student, assignment=a).first()
+
+            # If deadline was extended (now in future), remove prior auto-zero
+            if sub and sub.marks == 0 and sub.graded and a.deadline > now:
+                sub.delete()
+                continue
+
+            # If not submitted and deadline passed → auto-create 0
+            if not sub and a.deadline < now:
                 Submission.objects.update_or_create(
                     student=student,
                     assignment=a,
@@ -179,18 +184,17 @@ def class_detail(request, class_id):
                         'marks': 0.0,
                         'graded': True,
                         'released': True,
-                        'submitted_at': a.deadline
+                        'submitted_at': a.deadline  # record original deadline as submission time
                     }
                 )
 
-    # === BUILD submission_map FOR QUICK LOOKUP ===
+    # === Build Submission Map for Template Lookup ===
+    submission_map = {}
     if not is_teacher:
         submissions = Submission.objects.filter(student=request.user, assignment__in=assignments)
         submission_map = {s.assignment.id: s for s in submissions}
-    else:
-        submission_map = {}
 
-    # === PENDING ASSIGNMENTS COUNT (not yet submitted and not past deadline) ===
+    # === Pending Assignments Count ===
     pending_assignments = 0
     if not is_teacher:
         for a in assignments:
@@ -198,7 +202,7 @@ def class_detail(request, class_id):
             if not sub and a.deadline > now:
                 pending_assignments += 1
 
-    # === ATTENDANCE PERCENTAGE (student only) ===
+    # === Attendance Calculation ===
     attendance = 0
     attendance_color = "success"
     if enrollment:
@@ -216,40 +220,26 @@ def class_detail(request, class_id):
         else:
             attendance_color = "success"
 
-    # === ASSIGNMENT & QUIZ AVERAGES (use the same logic you used earlier) ===
-    # Assignment average: only consider submissions that are graded & released
-    student = request.user if not is_teacher else None
+    # === Assignment Average (all assignments, including auto-zeros) ===
+    assignment_avg = 0
     total_assignments = assignments.count()
 
     if not is_teacher and total_assignments > 0:
-        # Get all submissions (including 0-mark auto-graded)
-        subs = Submission.objects.filter(
-            student=student,
-            assignment__classroom=classroom
-        )
-
-        # Sum marks for all submissions; treat missing as 0
+        subs = Submission.objects.filter(student=request.user, assignment__classroom=classroom)
         total_marks = sum(s.marks or 0 for s in subs)
-        submitted_count = subs.count()
-
-        # If student hasn’t submitted for some assignments yet (and deadline not over),
-        # include them as 0 so the average is over total assignments
         assignment_avg = round(total_marks / total_assignments, 2)
-    else:
-        assignment_avg = 0
 
-    # Quiz average: same approach as before (if you track graded/quizzes)
+    # === Quiz Average (if you have quizzes model, else stays 0) ===
     quiz_avg = QuizAttempt.objects.filter(
         student=request.user,
         quiz__classroom=classroom,
         graded=True
     ).aggregate(Avg('score'))['score__avg'] or 0
 
-    # final weighted grade (same weights as previous code: 60% assignments, 40% quizzes)
-    quiz_avg = 0
-    final_grade = round(0.5 * assignment_avg + 0.5 * quiz_avg, 2) 
+    # === Final Weighted Grade (Assignments + Quizzes) ===
+    final_grade = round(0.5 * assignment_avg + 0.5 * quiz_avg, 2)
 
-    # Count overdue auto-zeros (useful display)
+    # === Count Overdue Auto-Zero Submissions (for dashboard + per-assignment flag) ===
     overdue_zeros = 0
     if not is_teacher:
         overdue_zeros = Submission.objects.filter(
@@ -257,15 +247,16 @@ def class_detail(request, class_id):
             assignment__classroom=classroom,
             marks=0,
             graded=True,
-            submitted_at__lte=now
+            assignment__deadline__lt=now
         ).count()
 
+    # === Context for Template ===
     context = {
         "classroom": classroom,
         "assignments": assignments,
         "attendance": round(attendance, 2),
         "attendance_color": attendance_color,
-        "assignment_avg": round(assignment_avg, 2),
+        "assignment_avg": assignment_avg,
         "quiz_avg": round(quiz_avg, 2),
         "final_grade": final_grade,
         "pending_assignments": pending_assignments,
@@ -276,6 +267,7 @@ def class_detail(request, class_id):
     }
 
     return render(request, "lms/class_detail.html", context)
+
 
 
 @login_required
@@ -492,17 +484,17 @@ def submit_assignment(request, assignment_id):
     )
 
     # Track submission history
-    SubmissionHistory.objects.create(
-        submission=submission,
-        submitted_at=timezone.now(),
-        action='created' if created else 'resubmitted'
-    )
+    SubmissionHistory.objects.create(submission=submission, action='Resubmitted')
+
 
     # Display feedback message
     if created:
-        messages.success(request, "✅ Assignment submitted successfully.")
+        SubmissionHistory.objects.create(submission=submission, action='First Submission')
+        messages.success(request, "Assignment submitted successfully.")
     else:
-        messages.success(request, "🔁 Resubmitted successfully (previous file replaced).")
+        SubmissionHistory.objects.create(submission=submission, action='Resubmission')
+        messages.success(request, "Resubmitted successfully (previous file replaced).")
+
 
     return redirect('class_assignments_student', class_id=classroom.id)
 
@@ -525,14 +517,21 @@ def grade_submission(request, submission_id):
     return render(request, 'lms/grade_submission.html', {'submission': submission})
 
 
-@login_required
+login_required
 def view_submissions(request, assignment_id):
-    assignment = get_object_or_404(Assignment, id=assignment_id, classroom__teacher=request.user)
-    submissions = Submission.objects.filter(assignment=assignment).select_related('student')
-    return render(request, 'lms/view_submissions.html', {
-        'assignment': assignment,
-        'submissions': submissions,
-    })
+    assignment = get_object_or_404(Assignment, id=assignment_id)
+    classroom = assignment.classroom
+    if classroom.teacher != request.user:
+        messages.error(request, "You are not authorized to view this page.")
+        return redirect('main')
+
+    submissions = Submission.objects.filter(assignment=assignment).select_related('student').prefetch_related('history')
+
+    context = {
+        "assignment": assignment,
+        "submissions": submissions,
+    }
+    return render(request, "lms/view_submissions.html", context)
 
 # Teacher: Edit Assignment
 @login_required
