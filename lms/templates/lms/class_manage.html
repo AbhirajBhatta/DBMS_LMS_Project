@@ -3,10 +3,32 @@
 {% block content %}
 
 <div class="container mt-4">
+
+  <!-- Course Header with Delete Option -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="fw-bold text-light mb-1">
+        {{ classroom.name }}
+        <span class="text-secondary">({{ classroom.code }})</span>
+      </h4>
+      <small class="text-secondary">
+        Start Date:
+        <span class="text-light">{{ classroom.start_date|date:'Y-m-d' }}</span>
+      </small>
+    </div>
+    <form method="post" action="{% url 'delete_course' classroom.id %}"
+          onsubmit="return confirm('Are you sure you want to delete this course? This cannot be undone.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-trash3"></i> Delete Course
+      </button>
+    </form>
+  </div>
+
   <div class="card p-4 mb-4 shadow-sm"
        style="background-color:#161b22; border:1px solid rgba(255,255,255,0.15); color:#e6eef6;">
-    <h4 class="fw-bold mb-3">{{ classroom.name }} <span class="text-secondary">({{ classroom.code }})</span></h4>
 
+    <!-- Add Student -->
     <div class="card p-3 mb-4"
          style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
       <h5 class="text-light mb-3">Add Student</h5>
@@ -21,6 +43,7 @@
       </form>
     </div>
 
+    <!-- Bulk Upload -->
     <div class="card p-3 mb-4"
          style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
       <h5 class="text-light mb-3">Bulk Upload (CSV)</h5>
@@ -32,9 +55,25 @@
                class="form-control bg-dark text-light border-secondary mb-2">
         <button class="btn btn-primary w-100">Upload</button>
       </form>
-      <small class="text-secondary mt-2 d-block">CSV must contain a single column: <code>reg_no</code></small>
+      <small class="text-secondary mt-2 d-block">
+        CSV must contain a single column: <code>reg_no</code>
+      </small>
     </div>
 
+    <!-- Manage Attendance Button -->
+    <div class="card p-3 mb-4"
+         style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
+      <h5 class="text-light mb-3">Attendance Management</h5>
+      <p class="text-secondary mb-3">
+        Record daily attendance and review student presence.
+      </p>
+      <a href="{% url 'manage_attendance' classroom.id %}"
+         class="btn btn-outline-warning w-100">
+        Manage Attendance
+      </a>
+    </div>
+
+    <!-- Enrolled Students -->
     <div class="card p-3 shadow-sm"
          style="background-color:#0d1117; border:1px solid rgba(255,255,255,0.08);">
       <h5 class="text-light mb-3">Enrolled Students</h5>
@@ -44,6 +83,8 @@
             <th>Name</th>
             <th>Register No</th>
             <th>Attendance</th>
+            <th>History</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -62,15 +103,39 @@
                   <span class="text-success fw-bold">{{ e.attendance_percent }}%</span>
                 {% endif %}
               </td>
+              <td>
+                <a href="{% url 'attendance_history_teacher' classroom.id e.student.id %}" 
+                   class="btn btn-outline-info btn-sm mb-2">
+                  View
+                </a>
+                <form method="post" 
+                      action="{% url 'clear_student_attendance' classroom.id e.student.id %}"
+                      onsubmit="return confirm('Are you sure you want to clear all attendance logs for {{ e.student.username }}?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    Clear
+                  </button>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="{% url 'remove_student' classroom.id e.id %}"
+                      onsubmit="return confirm('Remove {{ e.student.username }} from this class?');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-person-dash"></i> Remove
+                  </button>
+                </form>
+              </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="3" class="text-secondary text-center">No students enrolled yet.</td>
+              <td colspan="5" class="text-secondary text-center">No students enrolled yet.</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
   </div>
 </div>
 

@@ -27,7 +27,7 @@ class Classroom(models.Model):
     description = models.TextField(blank=True)
     teacher = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='owned_classrooms')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    start_date = models.DateField(default=timezone.now) 
     def __str__(self):
         return f"{self.code} - {self.name}"
 

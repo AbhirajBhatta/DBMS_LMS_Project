@@ -40,6 +40,10 @@
                 <span class="text-success">✅ Excellent consistency!</span>
               {% endif %}
             </p>
+            <a href="{% url 'attendance_history_student' classroom.id %}" 
+              class="btn btn-outline-info btn-sm mt-3 w-100">
+              View Full Attendance History
+            </a>
           </div>
         </div>
       </div>

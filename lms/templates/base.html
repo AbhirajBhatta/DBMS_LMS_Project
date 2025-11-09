@@ -25,7 +25,7 @@
       <ul class="navbar-nav align-items-center gap-3">
         {% if user.profile.role == 'teacher' %}
           <li class="nav-item"><a class="nav-link text-light" href="{% url 'main' %}">My Courses</a></li>
-          <li class="nav-item"><a class="nav-link text-light" href="#">Add Course</a></li>
+          <li class="nav-item"><a class="nav-link text-light" href="{% url 'add_course' %}">Add Course</a></li>
         {% else %}
           <li class="nav-item"><a class="nav-link text-light" href="{% url 'main' %}">My Classrooms</a></li>
         {% endif %}
