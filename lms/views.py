@@ -7,7 +7,7 @@ from django.db import IntegrityError
 from django.contrib import messages
 import csv, io
 from django.db.models import Avg
-from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, QuizAttempt, Attendance, SubmissionHistory
+from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, Quiz, Question, Attendance, SubmissionHistory, QuizAttempt
 from datetime import date, datetime
 from django.utils.dateformat import DateFormat
 from django.utils import timezone
@@ -555,5 +555,107 @@ def edit_assignment(request, assignment_id):
         'assignment': assignment,
         'classroom': classroom
     })
+
+@login_required
+def quizzes_teacher(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    if classroom.teacher != request.user:
+        messages.error(request, "Unauthorized access.")
+        return redirect('main')
+
+    quizzes = Quiz.objects.filter(classroom=classroom)
+    return render(request, 'lms/quizzes_teacher.html', {'classroom': classroom, 'quizzes': quizzes})
+
+
+@login_required
+def add_quiz(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    if classroom.teacher != request.user:
+        messages.error(request, "Unauthorized.")
+        return redirect('main')
+
+    if request.method == "POST":
+        title = request.POST.get('title')
+        description = request.POST.get('description', '')
+        deadline = request.POST.get('deadline')
+
+        quiz = Quiz.objects.create(
+            classroom=classroom,
+            title=title,
+            description=description,
+            deadline=deadline
+        )
+        messages.success(request, "Quiz created. Now add questions.")
+        return redirect('add_questions', quiz_id=quiz.id)
+
+    return render(request, 'lms/add_quiz.html', {'classroom': classroom})
+
+
+@login_required
+def add_questions(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+    if quiz.classroom.teacher != request.user:
+        messages.error(request, "Unauthorized.")
+        return redirect('main')
+
+    if request.method == "POST":
+        text = request.POST.get('text')
+        a = request.POST.get('option_a')
+        b = request.POST.get('option_b')
+        c = request.POST.get('option_c')
+        d = request.POST.get('option_d')
+        correct = request.POST.get('correct_option')
+
+        Question.objects.create(
+            quiz=quiz, text=text,
+            option_a=a, option_b=b, option_c=c, option_d=d,
+            correct_option=correct
+        )
+        messages.success(request, "Question added successfully.")
+        return redirect('add_questions', quiz_id=quiz.id)
+
+    questions = quiz.questions.all()
+    return render(request, 'lms/add_questions.html', {'quiz': quiz, 'questions': questions})
+
+@login_required
+def quizzes_student(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    quizzes = Quiz.objects.filter(classroom=classroom, visible=True).order_by('-deadline')
+    attempts = QuizAttempt.objects.filter(student=request.user, quiz__in=quizzes)
+    attempt_map = {a.quiz.id: a for a in attempts}
+    now = timezone.now()
+    return render(request, 'lms/quizzes_student.html', {
+        'classroom': classroom,
+        'quizzes': quizzes,
+        'attempt_map': attempt_map,
+        'now': now
+    })
+
+
+@login_required
+def attempt_quiz(request, quiz_id):
+    quiz = get_object_or_404(Quiz, id=quiz_id)
+    if timezone.now() > quiz.deadline:
+        messages.error(request, "Quiz deadline has passed.")
+        return redirect('class_quizzes_student', class_id=quiz.classroom.id)
+
+    if QuizAttempt.objects.filter(quiz=quiz, student=request.user).exists():
+        messages.warning(request, "You have already attempted this quiz.")
+        return redirect('class_quizzes_student', class_id=quiz.classroom.id)
+
+    if request.method == 'POST':
+        questions = quiz.questions.all()
+        correct = 0
+        for q in questions:
+            ans = request.POST.get(str(q.id))
+            if ans and ans == q.correct_option:
+                correct += 1
+        score = round((correct / len(questions)) * 10, 2)
+        QuizAttempt.objects.create(quiz=quiz, student=request.user, score=score)
+        messages.success(request, f"Quiz submitted! You scored {score}/10.")
+        return redirect('class_quizzes_student', class_id=quiz.classroom.id)
+
+    questions = quiz.questions.all()
+    return render(request, 'lms/attempt_quiz.html', {'quiz': quiz, 'questions': questions})
 
 

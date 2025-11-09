@@ -132,13 +132,6 @@ class Submission(models.Model):
         """Check if student is still allowed to resubmit."""
         return timezone.now() <= self.assignment.deadline
 
-
-class SubmissionHistory(models.Model):
-    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='history')
-    timestamp = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.submission.student.username} - {self.submission.assignment.title} @ {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
     
 class SubmissionHistory(models.Model):
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='history')
@@ -155,48 +148,47 @@ class SubmissionHistory(models.Model):
 class Quiz(models.Model):
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='quizzes')
     title = models.CharField(max_length=200)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
-    max_marks = models.IntegerField(default=10)
+    description = models.TextField(blank=True)
+    deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
-    release_grades = models.BooleanField(default=False)
+    visible = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.title} ({self.classroom.code})"
 
+    @property
+    def is_active(self):
+        return timezone.now() <= self.deadline
 
-class QuizQuestion(models.Model):
+
+class Question(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
     text = models.TextField()
-    marks = models.IntegerField(default=1)
+    option_a = models.CharField(max_length=200)
+    option_b = models.CharField(max_length=200)
+    option_c = models.CharField(max_length=200)
+    option_d = models.CharField(max_length=200)
+    correct_option = models.CharField(
+        max_length=1,
+        choices=[('A', 'A'), ('B', 'B'), ('C', 'C'), ('D', 'D')]
+    )
 
     def __str__(self):
-        return f"Q{self.id}: {self.text[:40]}"
-
-
-class QuizOption(models.Model):
-    question = models.ForeignKey(QuizQuestion, on_delete=models.CASCADE, related_name='options')
-    text = models.CharField(max_length=500)
-    is_correct = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"{self.text[:50]}"
+        return f"Q: {self.text[:50]}..."
 
 
 class QuizAttempt(models.Model):
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='attempts')
     student = models.ForeignKey(User, on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True)
-    finished_at = models.DateTimeField(null=True, blank=True)
     score = models.FloatField(default=0)
-    submitted = models.BooleanField(default=False)
-    graded = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(auto_now_add=True)
+    graded = models.BooleanField(default=True)  # For integration with overview
 
     class Meta:
         unique_together = ('quiz', 'student')
 
     def __str__(self):
-        return f"{self.student.username} - {self.quiz.title}"
+        return f"{self.student.username} - {self.quiz.title}: {self.score}"
 
 
 # -----------------------------
