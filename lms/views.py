@@ -1058,20 +1058,16 @@ def signup(request):
     if request.method == 'POST':
         form = SignUpForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            role = form.cleaned_data['role']
-            reg_no = form.cleaned_data.get('reg_no')
-
-            # Create linked profile
-            Profile.objects.create(user=user, role=role, reg_no=reg_no if role == 'student' else None)
-
+            form.save()
             messages.success(request, 'Account created successfully! Please log in.')
             return redirect('login')
         else:
+            print(form.errors.as_json())
             messages.error(request, 'Please correct the errors below.')
     else:
         form = SignUpForm()
     return render(request, 'lms/signup.html', {'form': form})
+
 
 
 def login_view(request):

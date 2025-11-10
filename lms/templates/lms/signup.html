@@ -128,19 +128,33 @@
     <h3 class="signup-title">Create an Account</h3>
 
     {% if form.errors %}
-      <div class="alert alert-danger py-1">Please correct the errors below.</div>
+      <div class="alert alert-danger py-2 px-3" style="text-align: left; border-radius: 8px;">
+        <strong>⚠️ Please fix the following error{{ form.errors|length|pluralize:"s" }}:</strong>
+        <ul class="mt-2 mb-0" style="margin-left: 1rem;">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+              <li><strong>{{ field|capfirst }}:</strong> {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endif %}
 
     <form method="post">
       {% csrf_token %}
       <div class="mb-3 text-start">
         <label class="form-label">Username</label>
-        {{ form.username }}
+        <input type="text" name="username" class="form-control" placeholder="Choose a username" required>
       </div>
+
       <div class="mb-3 text-start">
         <label class="form-label">Email</label>
-        {{ form.email }}
+        <input type="email" name="email" class="form-control" placeholder="Enter your email" required>
       </div>
+
 
       <div class="mb-3 text-start" id="reg_no_field" style="display: none;">
         <label class="form-label">Register Number</label>

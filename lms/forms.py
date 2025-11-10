@@ -63,29 +63,47 @@ class ReplyForm(forms.ModelForm):
         }
 
 class SignUpForm(UserCreationForm):
-    email = forms.EmailField(required=True)
+    email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={
+        'class': 'form-control', 'placeholder': 'Enter your email'
+    }))
     ROLE_CHOICES = [
         ('student', 'Student'),
         ('teacher', 'Teacher'),
     ]
-    role = forms.ChoiceField(choices=ROLE_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-control'}))
+    role = forms.ChoiceField(choices=ROLE_CHOICES, required=True,
+                             widget=forms.Select(attrs={'class': 'form-control'}))
     reg_no = forms.CharField(
         required=False,
         max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Register Number (if student)'}),
         label="Register Number"
     )
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password1', 'password2', 'role', 'reg_no']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Choose a username'}),
+        }
 
     def clean(self):
         cleaned_data = super().clean()
         role = cleaned_data.get('role')
         reg_no = cleaned_data.get('reg_no')
 
-        # If the role is student, reg_no is mandatory
         if role == 'student' and not reg_no:
             raise forms.ValidationError("Register number is required for students.")
         return cleaned_data
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']  # ✅ Explicitly assign email
+        if commit:
+            user.save()
+            # ✅ Automatically create the profile
+            Profile.objects.create(
+                user=user,
+                role=self.cleaned_data['role'],
+                reg_no=self.cleaned_data['reg_no'] if self.cleaned_data['role'] == 'student' else None
+            )
+        return user
