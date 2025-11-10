@@ -230,21 +230,36 @@ class Resource(models.Model):
 # DISCUSSIONS + COMMENTS
 # -----------------------------
 class Discussion(models.Model):
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='discussions')
+    classroom = models.ForeignKey('Classroom', on_delete=models.CASCADE, related_name='discussions')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=200)
+    title = models.CharField(max_length=255)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f"{self.title} ({self.classroom.code})"
+        return f"{self.title} — {self.classroom.name}"
 
 
-class Comment(models.Model):
-    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='comments')
+class Reply(models.Model):
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name='replies')
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField()
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='child_replies')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='children'
+    )
+
+    class Meta:
+        ordering = ['created_at']
+
     def __str__(self):
-        return f"{self.author.username}: {self.content[:40]}"
+        return f"Reply by {self.author.username} on {self.discussion.title}"

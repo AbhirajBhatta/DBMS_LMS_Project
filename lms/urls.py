@@ -36,4 +36,10 @@ urlpatterns = [
     #RESOURCES
     path('class/<int:class_id>/resources/', views.class_resources, name='class_resources'),
     path('resource/<int:resource_id>/delete/', views.delete_resource, name='delete_resource'),
+
+    #DISCUSSIONS
+    path('class/<int:class_id>/discussions/', views.class_discussions, name='class_discussions'),
+    path('discussion/<int:discussion_id>/', views.discussion_detail, name='discussion_detail'),
+    path('reply/delete/<int:reply_id>/', views.delete_reply, name='delete_reply'),
+
 ]   

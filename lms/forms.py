@@ -1,6 +1,6 @@
 # lms/forms.py
 from django import forms
-from .models import Assignment, Quiz
+from .models import Assignment, Quiz, Discussion, Reply
 
 class AssignmentForm(forms.ModelForm):
     class Meta:
@@ -42,3 +42,22 @@ class QuizForm(forms.ModelForm):
             "end_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "description": forms.Textarea(attrs={"rows": 3}),
         }
+
+class DiscussionForm(forms.ModelForm):
+    class Meta:
+        model = Discussion
+        fields = ['title', 'content']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter topic title'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Start the discussion...'}),
+        }
+
+class ReplyForm(forms.ModelForm):
+    class Meta:
+        model = Reply
+        fields = ['content']
+        widgets = {
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Reply...'}),
+        }
+
+        

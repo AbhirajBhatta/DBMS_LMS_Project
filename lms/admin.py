@@ -12,7 +12,7 @@ from .models import (
     QuizAttempt,
     Resource,
     Discussion,
-    Comment
+    Reply
 )
 
 # Register all models for easy data management in admin panel
@@ -28,7 +28,7 @@ admin.site.register(Option)
 admin.site.register(QuizAttempt)
 admin.site.register(Resource)
 admin.site.register(Discussion)
-admin.site.register(Comment)
+admin.site.register(Reply)
 
 
 

@@ -7,14 +7,14 @@ from django.db import IntegrityError
 from django.contrib import messages
 import csv, io
 from django.db.models import Max, Avg
-from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, Quiz, Question, Attendance, SubmissionHistory, QuizAttempt, Option
+from .models import Classroom, Enrollment, Profile, Resource, Discussion, Assignment, Submission, Quiz, Question, Attendance, SubmissionHistory, QuizAttempt, Option, Reply
 from datetime import date, datetime
 from django.utils.dateformat import DateFormat
 from django.utils import timezone
 from django.contrib import messages
 from .forms import AssignmentForm
 from django.utils.dateparse import parse_datetime
-
+from .forms import DiscussionForm, ReplyForm
 
 # Main dashboard (replaces old dashboard)
 @login_required
@@ -950,4 +950,80 @@ def delete_resource(request, resource_id):
         messages.error(request, "You are not authorized to delete this resource.")
     return redirect('class_resources', class_id=classroom.id)
 
+#-------------------
+#Discussions
+#-------------------
 
+@login_required
+def class_discussions(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    discussions = Discussion.objects.filter(classroom=classroom).select_related('author')
+    is_teacher = classroom.teacher == request.user
+
+    # Only allow teacher to create a discussion
+    if is_teacher and request.method == 'POST':
+        form = DiscussionForm(request.POST)
+        if form.is_valid():
+            discussion = form.save(commit=False)
+            discussion.classroom = classroom
+            discussion.author = request.user
+            discussion.save()
+            messages.success(request, "Discussion posted successfully.")
+            return redirect('class_discussions', class_id=classroom.id)
+    else:
+        form = DiscussionForm() if is_teacher else None
+
+    return render(request, 'lms/discussions.html', {
+        'classroom': classroom,
+        'discussions': discussions,
+        'form': form,
+        'is_teacher': is_teacher
+    })
+
+
+@login_required
+def discussion_detail(request, discussion_id):
+    discussion = get_object_or_404(Discussion, id=discussion_id)
+    replies = Reply.objects.filter(discussion=discussion, parent=None).select_related('author').prefetch_related('children')
+    classroom = discussion.classroom
+
+    if request.method == 'POST':
+        content = request.POST.get('content')
+        parent_id = request.POST.get('parent_id')
+
+        if content:
+            parent = None
+            if parent_id:
+                try:
+                    parent = Reply.objects.get(id=parent_id)
+                except Reply.DoesNotExist:
+                    parent = None
+
+            Reply.objects.create(
+                discussion=discussion,
+                author=request.user,
+                content=content,
+                parent=parent
+            )
+            return redirect('discussion_detail', discussion_id=discussion.id)
+
+    return render(request, 'lms/discussion_detail.html', {
+        'discussion': discussion,
+        'replies': replies,
+        'classroom': classroom,
+    })
+
+@login_required
+def delete_reply(request, reply_id):
+    reply = get_object_or_404(Reply, id=reply_id)
+    discussion = reply.discussion
+    classroom = discussion.classroom
+
+    # Only teachers of the class can delete any reply
+    if request.user == classroom.teacher:
+        reply.delete()
+        messages.success(request, "Reply deleted successfully.")
+    else:
+        messages.error(request, "You do not have permission to delete this reply.")
+
+    return redirect('discussion_detail', discussion_id=discussion.id)

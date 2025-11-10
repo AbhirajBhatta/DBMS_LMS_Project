@@ -1,0 +1,115 @@
+{% load static %}
+
+<style>
+  /* === Discussion Replies Styling (Self-contained) === */
+
+  .reply-container {
+    --level: 0;
+    border-left: 2px solid #30363d;
+    padding-left: 1rem;
+    margin-left: calc(var(--level) * 1.5rem);
+  }
+
+  .reply-box {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s ease;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .reply-box:hover {
+    background-color: #1c2128;
+  }
+
+  .reply-box strong {
+    color: #58a6ff;
+  }
+
+  .reply-box small {
+    color: #8b949e;
+  }
+
+  .reply-box p {
+    color: #c9d1d9;
+    margin-bottom: 0.5rem;
+  }
+
+  .reply-box button.btn-outline-info {
+    color: #58a6ff;
+    border-color: #58a6ff;
+  }
+
+  .reply-box button.btn-outline-info:hover {
+    background-color: #58a6ff;
+    color: #0d1117;
+  }
+
+  .reply-box button.btn-outline-danger {
+    border-color: #f85149;
+    color: #f85149;
+  }
+
+  .reply-box button.btn-outline-danger:hover {
+    background-color: #f85149;
+    color: #0d1117;
+  }
+
+  textarea.form-control {
+    background-color: #0d1117 !important;
+    color: #f0f6fc !important;
+    border: 1px solid #30363d !important;
+  }
+
+  textarea.form-control:focus {
+    border-color: #58a6ff !important;
+    box-shadow: 0 0 0 2px rgba(88,166,255,0.2);
+  }
+
+  .nested-reply {
+    margin-left: 1.5rem;
+  }
+</style>
+
+<!-- === Reply Thread Template === -->
+
+<div class="reply-container mt-3" style="--level: {{ level|add:'0' }}">
+  <div class="reply-box">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <div>
+        <strong>{{ reply.author.username }}</strong>
+        <small class="ms-2">{{ reply.created_at|date:"M d, H:i" }}</small>
+      </div>
+
+      {% if request.user == discussion.classroom.teacher %}
+      <form method="post" action="{% url 'delete_reply' reply.id %}" onsubmit="return confirm('Delete this reply?');" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Delete Reply">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
+      {% endif %}
+    </div>
+
+    <p>{{ reply.content }}</p>
+
+    <button class="btn btn-sm btn-outline-info py-0 px-2" type="button"
+            onclick="document.getElementById('reply-form-{{ reply.id }}').classList.toggle('d-none')">
+      Reply
+    </button>
+
+    <form method="post" id="reply-form-{{ reply.id }}" class="mt-2 d-none">
+      {% csrf_token %}
+      <input type="hidden" name="parent_id" value="{{ reply.id }}">
+      <textarea name="content" class="form-control form-control-sm" rows="2" placeholder="Write a reply..."></textarea>
+      <button type="submit" class="btn btn-sm btn-success mt-2">Submit</button>
+    </form>
+  </div>
+
+  {% for child in reply.children.all %}
+    <div class="nested-reply">
+      {% include 'lms/reply_thread.html' with reply=child level=level|add:1 %}
+    </div>
+  {% endfor %}
+</div>
