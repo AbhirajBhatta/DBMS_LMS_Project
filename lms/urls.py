@@ -33,4 +33,7 @@ urlpatterns = [
     path('quiz/<int:quiz_id>/attempts/', views.view_attempts_teacher, name='view_attempts_teacher'),
     path('quiz/<int:quiz_id>/delete/', views.delete_quiz, name='delete_quiz'),
 
+    #RESOURCES
+    path('class/<int:class_id>/resources/', views.class_resources, name='class_resources'),
+    path('resource/<int:resource_id>/delete/', views.delete_resource, name='delete_resource'),
 ]   

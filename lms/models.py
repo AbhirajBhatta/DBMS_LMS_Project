@@ -212,14 +212,18 @@ class QuizAttempt(models.Model):
 # STUDY MATERIALS
 # -----------------------------
 class Resource(models.Model):
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, related_name='resources')
-    title = models.CharField(max_length=200)
-    file = models.FileField(upload_to='resources/', blank=True, null=True)
-    link = models.URLField(blank=True, null=True)
+    classroom = models.ForeignKey('Classroom', on_delete=models.CASCADE, related_name='resources')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    file = models.FileField(upload_to='resources/', null=True, blank=True, default=None)
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-uploaded_at']
+
     def __str__(self):
-        return f"{self.title} ({self.classroom.code})"
+        return self.title
 
 
 # -----------------------------

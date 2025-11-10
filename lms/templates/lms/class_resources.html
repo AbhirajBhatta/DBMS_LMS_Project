@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Resources — {{ classroom.name }}{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h4 class="text-light mb-3">Resources — {{ classroom.name }}</h4>
+
+  {% if is_teacher %}
+  <div class="card bg-dark border-secondary p-3 mb-4">
+    <h6 class="text-light mb-3">Add New Resource</h6>
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <input type="text" name="title" class="form-control bg-dark text-light border-secondary" placeholder="Title" required>
+        </div>
+        <div class="col-md-6">
+          <input type="text" name="description" class="form-control bg-dark text-light border-secondary" placeholder="Description (optional)">
+        </div>
+        <div class="col-md-2">
+          <input type="file" name="file" class="form-control bg-dark text-light border-secondary" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-success btn-sm mt-2">Upload</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if resources %}
+  <div class="row row-cols-1 row-cols-md-2 g-3">
+    {% for r in resources %}
+    <div class="col">
+      <div class="card bg-dark border-secondary h-100 p-3">
+        <h6 class="text-light">{{ r.title }}</h6>
+        {% if r.description %}<p class="text-secondary small">{{ r.description }}</p>{% endif %}
+        <p class="text-secondary small mb-1">
+          Uploaded by: <span class="text-info">{{ r.uploaded_by.username }}</span> — {{ r.uploaded_at|date:"Y-m-d H:i" }}
+        </p>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <a href="{{ r.file.url }}" class="btn btn-outline-info btn-sm" download>Download</a>
+          {% if is_teacher %}
+          <form method="POST" action="{% url 'delete_resource' r.id %}" onsubmit="return confirm('Delete this resource?');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-secondary mt-4">No resources uploaded yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

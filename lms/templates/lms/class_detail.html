@@ -152,7 +152,9 @@
             <h5 class="text-light mb-3">
               <i class="bi bi-folder2-open me-2 text-info"></i> Course Materials
             </h5>
+
             {% if materials %}
+              <p class="text-success mb-2">📘 Find resources here:</p>
               {% for m in materials|slice:":3" %}
                 <div class="mb-1">
                   <a href="{{ m.file.url }}" class="text-info text-decoration-none">{{ m.title }}</a>
@@ -162,7 +164,11 @@
               <p class="text-secondary">No materials uploaded yet.</p>
             {% endif %}
           </div>
-          <a href="#" class="btn btn-outline-info btn-sm w-100 mt-3">View All</a>
+
+          <a href="{% url 'class_resources' classroom.id %}" 
+            class="btn btn-outline-info btn-sm w-100 mt-3">
+            View All
+          </a>
         </div>
       </div>
     </div>

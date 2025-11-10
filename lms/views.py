@@ -304,6 +304,7 @@ def class_detail(request, class_id):
 
     # === Context ===
     # NOTE: quiz_avg is provided for template compatibility and is the score used for grading (best_quiz_score)
+    materials = Resource.objects.filter(classroom=classroom).order_by('-uploaded_at')[:3]
     context = {
         "classroom": classroom,
         "assignments": assignments,
@@ -320,6 +321,7 @@ def class_detail(request, class_id):
         "now": now,
         "overdue_zeros": overdue_zeros,
         "quizzes": quizzes_context,  # for template loop
+        "materials": materials,
     }
 
     return render(request, "lms/class_detail.html", context)
@@ -900,5 +902,52 @@ def view_attempts_teacher(request, quiz_id):
     return render(request, 'lms/view_attempts_teacher.html', {'quiz': quiz, 'attempts': attempts})
 
 
+
+#------------------------
+#CLASS RESOURCES
+#------------------------
+
+@login_required
+def class_resources(request, class_id):
+    classroom = get_object_or_404(Classroom, id=class_id)
+    is_teacher = classroom.teacher == request.user
+
+    resources = Resource.objects.filter(classroom=classroom)
+
+    if request.method == 'POST' and is_teacher:
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        file = request.FILES.get('file')
+
+        if not title or not file:
+            messages.error(request, "Title and file are required.")
+        else:
+            Resource.objects.create(
+                classroom=classroom,
+                title=title,
+                description=description,
+                file=file,
+                uploaded_by=request.user
+            )
+            messages.success(request, "Resource added successfully.")
+            return redirect('class_resources', class_id=classroom.id)
+
+    return render(request, 'lms/class_resources.html', {
+        'classroom': classroom,
+        'resources': resources,
+        'is_teacher': is_teacher
+    })
+
+
+@login_required
+def delete_resource(request, resource_id):
+    resource = get_object_or_404(Resource, id=resource_id)
+    classroom = resource.classroom
+    if request.user == classroom.teacher:
+        resource.delete()
+        messages.success(request, "Resource deleted successfully.")
+    else:
+        messages.error(request, "You are not authorized to delete this resource.")
+    return redirect('class_resources', class_id=classroom.id)
 
 
