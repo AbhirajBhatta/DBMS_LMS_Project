@@ -1,6 +1,8 @@
 # lms/forms.py
 from django import forms
-from .models import Assignment, Quiz, Discussion, Reply
+from .models import Assignment, Quiz, Discussion, Reply, Profile
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
 
 class AssignmentForm(forms.ModelForm):
     class Meta:
@@ -60,4 +62,30 @@ class ReplyForm(forms.ModelForm):
             'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Reply...'}),
         }
 
-        
+class SignUpForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+    ROLE_CHOICES = [
+        ('student', 'Student'),
+        ('teacher', 'Teacher'),
+    ]
+    role = forms.ChoiceField(choices=ROLE_CHOICES, required=True, widget=forms.Select(attrs={'class': 'form-control'}))
+    reg_no = forms.CharField(
+        required=False,
+        max_length=20,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label="Register Number"
+    )
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'password1', 'password2', 'role', 'reg_no']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        role = cleaned_data.get('role')
+        reg_no = cleaned_data.get('reg_no')
+
+        # If the role is student, reg_no is mandatory
+        if role == 'student' and not reg_no:
+            raise forms.ValidationError("Register number is required for students.")
+        return cleaned_data

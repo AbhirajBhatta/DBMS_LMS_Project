@@ -2,7 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.main, name='main'),
+    path('', views.home, name='home'),            # Public landing page
+    path('dashboard/', views.main, name='main'),
+    path('signup/', views.signup, name='signup'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
     path('add_course/', views.add_course, name='add_course'),
     path('class/<int:class_id>/manage/', views.class_manage, name='class_manage'),
     path('class/<int:class_id>/add_student/', views.add_student, name='add_student'),

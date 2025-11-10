@@ -15,6 +15,9 @@ from django.contrib import messages
 from .forms import AssignmentForm
 from django.utils.dateparse import parse_datetime
 from .forms import DiscussionForm, ReplyForm
+from django.contrib.auth import login, authenticate
+from django.contrib.auth.forms import AuthenticationForm
+from .forms import SignUpForm
 
 # Main dashboard (replaces old dashboard)
 @login_required
@@ -47,7 +50,7 @@ def main(request):
 # Optional: simple logout handler
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect('home')
 
 
 # Create your views here.
@@ -574,7 +577,7 @@ def grade_submission(request, submission_id):
     return render(request, 'lms/grade_submission.html', {'submission': submission})
 
 
-login_required
+@login_required
 def view_submissions(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
     classroom = assignment.classroom
@@ -618,7 +621,6 @@ def edit_assignment(request, assignment_id):
 # =========================
 # TEACHER: VIEW QUIZZES
 # =========================
-@login_required
 @login_required
 def quizzes_teacher(request, class_id):
     """
@@ -1027,3 +1029,47 @@ def delete_reply(request, reply_id):
         messages.error(request, "You do not have permission to delete this reply.")
 
     return redirect('discussion_detail', discussion_id=discussion.id)
+
+def home(request):
+    """Public landing page with Login / Signup buttons."""
+    if request.user.is_authenticated:
+        return redirect('main')
+    return render(request, 'lms/home.html')
+
+
+def signup(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            role = form.cleaned_data['role']
+            reg_no = form.cleaned_data.get('reg_no')
+
+            # Create linked profile
+            Profile.objects.create(user=user, role=role, reg_no=reg_no if role == 'student' else None)
+
+            messages.success(request, 'Account created successfully! Please log in.')
+            return redirect('login')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = SignUpForm()
+    return render(request, 'lms/signup.html', {'form': form})
+
+
+def login_view(request):
+    """Handles user login and redirects to main dashboard."""
+    if request.user.is_authenticated:
+        return redirect('main')
+
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect('main')
+        else:
+            messages.error(request, 'Invalid username or password.')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'lms/login.html', {'form': form})
