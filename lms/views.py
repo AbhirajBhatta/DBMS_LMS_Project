@@ -467,6 +467,23 @@ def add_assignment(request, class_id):
         'classroom': classroom
     })
 
+@login_required
+def delete_assignment(request, assignment_id):
+    assignment = get_object_or_404(Assignment, id=assignment_id)
+
+    # Only teacher can delete
+    if request.user != assignment.classroom.teacher:
+        messages.error(request, "You are not authorized to delete this assignment.")
+        return redirect('class_detail', class_id=assignment.classroom.id)
+
+    # Confirm and delete
+    if request.method == "POST":
+        assignment.delete()
+        messages.success(request, f"✅ Assignment '{assignment.title}' deleted successfully.")
+        return redirect('class_assignments_teacher', class_id=assignment.classroom.id)
+
+    messages.warning(request, "⚠️ Invalid request.")
+    return redirect('class_assignments_teacher', class_id=assignment.classroom.id)
 
 @login_required
 def class_assignments_teacher(request, class_id):
@@ -544,7 +561,7 @@ def submit_assignment(request, assignment_id):
     )
 
     # Track submission history
-    SubmissionHistory.objects.create(submission=submission, action='Resubmitted')
+    # SubmissionHistory.objects.create(submission=submission, action='Resubmitted')
 
 
     # Display feedback message
